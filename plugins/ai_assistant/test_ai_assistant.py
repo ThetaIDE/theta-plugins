@@ -2220,6 +2220,7 @@ def test_eval_cli_runs_each_provider_and_writes_json(tmp_path, monkeypatch, caps
             )
 
     monkeypatch.setattr(eval_cli, "PROVIDERS", {"fake": Fake})
+    monkeypatch.setattr(eval_cli, "KeyStore", lambda: KeyStore(backend=FakeKeychain(), env={}))  # no real keychain
     monkeypatch.setattr(eval_cli, "create_provider", lambda pid, config: Fake(config))
     out = tmp_path / "results.json"
     code = eval_cli.main(
@@ -2778,3 +2779,213 @@ def test_chat_shows_figures_inline_scaled_to_the_panel_and_deleting_the_chat_rem
         panel.shutdown()
         panel.deleteLater()
         app.processEvents()
+
+
+# ── Keys entered in the panel, the keychain wake-up, and the chat list ──────
+
+
+class SleepingKeychain(FakeKeychain):
+    """A keychain whose daemon is not running until woken (KWallet under i3, for example)."""
+
+    def __init__(self):
+        super().__init__()
+        self.awake = False
+        self.core = SimpleNamespace(init_backend=lambda: None)
+
+    def get_keyring(self):
+        return self if self.awake else SimpleNamespace(__module__="keyring.backends.fail")
+
+
+def insecure():
+    class Fail:
+        pass
+
+    Fail.__module__ = "keyring.backends.fail"
+    return Fail()
+
+
+def test_saving_a_key_wakes_a_sleeping_keychain_once():
+    keychain = SleepingKeychain()
+    keychain.get_keyring = lambda: keychain if keychain.awake else insecure()
+    wakes = []
+
+    def wake():
+        wakes.append(1)
+        keychain.awake = True
+        return True
+
+    keys = KeyStore(backend=keychain, env={}, waker=wake)
+    assert not keys.is_secure()
+    keys.set("openrouter", "sk-or-1234567890")
+    assert keychain.store == {("ThetaIDE", "openrouter-api-key"): "sk-or-1234567890"}
+    keys.set("openai", "sk-abcdefghij")
+    assert wakes == [1]
+
+
+def test_without_any_keychain_a_key_can_be_used_for_the_session_only():
+    keychain = FakeKeychain()
+    keychain.get_keyring = insecure
+    keys = KeyStore(backend=keychain, env={"OPENAI_API_KEY": "sk-env-0000"}, waker=lambda: False)
+    with pytest.raises(KeyStoreError, match="OPENAI_API_KEY"):
+        keys.set("openai", "sk-typed-1234")
+    keys.set_session("openai", " sk-typed-1234 ")
+    assert keys.get("openai") == "sk-typed-1234" and keys.source("openai") == "session"
+    assert keychain.store == {}  # nothing was written anywhere
+    keys.delete("openai")
+    assert keys.source("openai") == "environment"
+
+
+def test_a_pinned_keyring_backend_is_never_woken(monkeypatch):
+    from plugins.ai_assistant import keys as keys_module
+
+    monkeypatch.setattr(keys_module, "wake_secret_service", lambda: pytest.fail("woke the desktop keychain"))
+    assert KeyStore(env={"PYTHON_KEYRING_BACKEND": "keyring.backends.fail.Keyring"})._waker() is False
+
+
+def make_panel(tmp_path, keys, settings=None):
+    import os
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from plugins.ai_assistant import panel as panel_module
+
+    class Context:
+        window = SimpleNamespace(runs=[], selected=None, active_runs=[], current_experiment=None)
+
+        def __init__(self):
+            self.settings = dict(settings or {})
+
+        def get_workspace_dir(self):
+            return tmp_path
+
+        def get_data_dir(self):
+            return tmp_path / ".thetaide"
+
+        def get_setting(self, key, default=None):
+            return self.settings.get(key, default)
+
+        def set_setting(self, key, value):
+            self.settings[key] = value
+
+    return panel_module.AssistantPanel(Context(), keys)
+
+
+def close_panel(panel):
+    from PyQt6.QtWidgets import QApplication
+
+    panel.shutdown()
+    panel.deleteLater()
+    QApplication.instance().processEvents()
+
+
+def test_api_key_is_entered_in_the_panel_and_hidden_once_saved(tmp_path):
+    from PyQt6.QtWidgets import QApplication
+
+    app = QApplication.instance() or QApplication([])
+    keychain = FakeKeychain()
+    panel = make_panel(tmp_path, KeyStore(backend=keychain, env={}), {"provider": "openrouter"})
+    try:
+        panel.resize(460, 800)
+        panel.show()
+        app.processEvents()
+        assert panel.provider_id == "openrouter"
+        assert panel.key_bar.isVisible() and not panel.key_cancel.isVisible()
+        assert "openrouter.ai/keys" in panel.key_prompt.text()
+        panel.key_input.setText("sk-or-abcdefgh1234")
+        panel.key_input.returnPressed.emit()
+        assert keychain.store == {("ThetaIDE", "openrouter-api-key"): "sk-or-abcdefgh1234"}
+        assert not panel.key_bar.isVisible() and panel.key_input.text() == ""
+        assert "1234" in panel._key_description() and "abcdefgh" not in panel._key_description()
+
+        panel.edit_key()  # Change API key… from the ⋯ menu
+        assert panel.key_bar.isVisible() and panel.key_cancel.isVisible()
+        panel.key_cancel.click()
+        assert not panel.key_bar.isVisible()
+
+        panel.provider_box.setCurrentIndex(panel.provider_box.findData("ollama"))
+        assert not panel.key_bar.isVisible()  # local models need no key
+    finally:
+        close_panel(panel)
+
+
+def test_without_a_keychain_the_panel_offers_this_session_only(tmp_path, monkeypatch):
+    from PyQt6.QtWidgets import QApplication
+
+    app = QApplication.instance() or QApplication([])
+    keychain = FakeKeychain()
+    keychain.get_keyring = insecure
+    keys = KeyStore(backend=keychain, env={}, waker=lambda: False)
+    panel = make_panel(tmp_path, keys, {"provider": "openai"})
+    try:
+        panel.show()
+        app.processEvents()
+        asked = []
+        monkeypatch.setattr(panel, "_use_key_for_session", lambda reason: asked.append(reason) or True)
+        panel.key_input.setText("sk-typed-98765")
+        panel._save_key()
+        assert asked and "No secure OS keychain" in asked[0]
+        assert keys.source("openai") == "session" and keychain.store == {}
+        assert not panel.key_bar.isVisible() and "not saved" in panel.status.text()
+    finally:
+        close_panel(panel)
+
+
+def test_saved_chats_live_in_a_sidebar_list(tmp_path):
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QApplication
+
+    from plugins.ai_assistant.chat_store import Chat
+
+    app = QApplication.instance() or QApplication([])
+    keys = KeyStore(backend=FakeKeychain(), env={"OPENAI_API_KEY": "sk-env-1234"})
+    panel = make_panel(tmp_path, keys)
+    try:
+        panel.resize(700, 800)
+        panel.show()
+        app.processEvents()
+        assert not panel.history_pane.isVisible()  # closed by default; the panel is narrow
+        for title in ("First question", "Second question"):
+            chat = Chat(title=title)
+            chat.history.append(Message("user", title))
+            chat.entries.append({"kind": "user", "text": title})
+            panel.store.save(chat)
+        panel.history_toggle.click()
+        assert panel.history_pane.isVisible() and panel.context.settings["history_open"] is True
+        titles = [panel.history_list.item(i).text().split("\n")[0] for i in range(panel.history_list.count())]
+        assert sorted(titles) == ["First question", "Second question"]
+
+        item = next(
+            panel.history_list.item(i)
+            for i in range(panel.history_list.count())
+            if panel.history_list.item(i).text().startswith("First")
+        )
+        panel._history_clicked(item)
+        assert panel.chat.title == "First question" and "First question" in panel.transcript.toPlainText()
+        assert panel.history_list.currentItem().data(Qt.ItemDataRole.UserRole) == panel.chat.id
+
+        other = next(c.id for c in panel.store.list() if c.id != panel.chat.id)
+        panel._delete_chat(other)  # deleting another chat leaves this one open
+        assert [c.title for c in panel.store.list()] == ["First question"]
+        assert panel.chat.title == "First question" and panel.history_list.count() == 1
+
+        panel.history_toggle.click()
+        assert not panel.history_pane.isVisible() and panel.context.settings["history_open"] is False
+    finally:
+        close_panel(panel)
+
+
+def test_quick_prompts_are_compact_chips_not_full_width_buttons(tmp_path):
+    from PyQt6.QtWidgets import QApplication
+
+    app = QApplication.instance() or QApplication([])
+    panel = make_panel(tmp_path, KeyStore(backend=FakeKeychain(), env={}))
+    try:
+        panel.resize(900, 800)
+        panel.show()
+        app.processEvents()
+        chips = panel.prompt_chips
+        assert [c.text() for c in chips] == ["Why did it fail?", "Compare last two", "Tune it"]
+        used = sum(c.width() for c in chips)
+        assert used < panel.transcript.width() * 0.6  # they keep their natural size, left-aligned
+        assert chips[0].x() < chips[1].x() < chips[2].x() and chips[0].x() < 40
+    finally:
+        close_panel(panel)

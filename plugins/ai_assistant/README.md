@@ -20,9 +20,13 @@ The model box accepts any model id. Press **↻** to list the models your key ca
 
 ### API keys
 
-Press **Set API key…** (or go to **Settings → Plugins → AI Assistant**). Keys go into the OS keychain through Python's `keyring` package: macOS Keychain, Windows Credential Locker, or Secret Service (GNOME Keyring or KWallet) on Linux. Keys are never written to `settings.toml` or the plugin's JSON storage, and the UI shows only the last four characters.
+When the chosen provider has no key, the panel asks for one right under the model picker: paste it and press **Enter** (or **Save**). A **Get a key ↗** link opens the provider's key page. To change or remove a key later, use the **⋯** menu, which also shows where the current key comes from. You can also use **Settings → Plugins → AI Assistant**.
 
-If there is no secure keychain, the plugin will not save the key at all, so it never falls back to a plaintext file. Set the provider's environment variable from the table above instead.
+Keys go into the OS keychain through Python's `keyring` package: macOS Keychain, Windows Credential Locker, or the Secret Service (GNOME Keyring or KWallet) on Linux. They are never written to `settings.toml`, the plugin's JSON storage or any other file, and the UI shows only the last four characters.
+
+Window managers such as i3 or sway often have KWallet or GNOME Keyring installed but not running. The plugin starts it over D-Bus when it needs it, so saving works without extra setup. The first save may show the keychain's own prompt to create or unlock a wallet.
+
+If there is no keychain at all, the plugin offers to use the key **for this session only**: it stays in memory until ThetaIDE closes and is never written to disk. To avoid entering it each time, set the provider's environment variable from the table above.
 
 ### What leaves your computer
 
@@ -31,6 +35,12 @@ The first time you send a message to a cloud provider, a notice lists what that 
 ### AI can make mistakes
 
 A line under the message box says so. The assistant's diagnoses, comparisons and suggested hyperparameters can be wrong, and its file changes can be too. Check important answers against the logs and metrics, and read each diff before you approve it.
+
+## Chats
+
+Press **☰** to show your saved chats in a list beside the conversation. Click a chat to reopen it. Right-click (or press **Delete**) to delete one. **＋** starts a new chat. Chats are saved in `.thetaide/assistant/chats` in the workspace.
+
+The **Why did it fail?**, **Compare last two** and **Tune it** chips under the conversation send a ready-made question about the selected run.
 
 ## What it can see and do
 
@@ -65,7 +75,7 @@ A run id may be `selected` (the run open in the Training Monitor) or `latest`. *
 
 Each code block in a reply has a **⧉ Copy** link under it, for pasting a suggested config. Each tool call shows as a line in the chat. Click it to see the exact arguments the model sent and the result it got back. Click again to hide them.
 
-Chats are saved after every reply to `.thetaide/assistant/chats/` in the workspace, one JSON file per chat, written atomically. The last chat reopens when the IDE starts. **History** lists recent chats and can delete the open one. The 100 most recent chats are kept. Chats hold run data from your workspace but never API keys. A saved chat can be continued with any provider, since history is stored in the provider-neutral format.
+Chats are saved after every reply to `.thetaide/assistant/chats/` in the workspace, one JSON file per chat, written atomically. The last chat reopens when the IDE starts. The **☰** chat list shows them. The 100 most recent chats are kept. Chats hold run data from your workspace but never API keys. A saved chat can be continued with any provider, since history is stored in the provider-neutral format.
 
 ## Cost and prompt caching
 

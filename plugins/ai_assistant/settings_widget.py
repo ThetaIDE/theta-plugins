@@ -110,11 +110,11 @@ class AssistantSettings(QWidget):
                 continue
             source = self.keys.source(pid)
             label.setText(
-                f"{mask(self.keys.get(pid))} (OS keychain)"
-                if source == "keychain"
-                else f"from ${ENV_VARS[pid]}"
-                if source == "environment"
-                else "Not set"
+                {
+                    "keychain": f"{mask(self.keys.get(pid))} (OS keychain)",
+                    "session": f"{mask(self.keys.get(pid))} (this session only, not saved)",
+                    "environment": f"from ${ENV_VARS[pid]}",
+                }.get(source or "", "Not set")
             )
 
     def _set_key(self, pid: str) -> None:

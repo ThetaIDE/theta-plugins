@@ -23,13 +23,15 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QFrame,
     QHBoxLayout,
-    QInputDialog,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QSplitter,
     QTextBrowser,
     QToolButton,
     QVBoxLayout,
@@ -193,6 +195,45 @@ RELAY_NOTE = """\
 (for example OpenAI, Anthropic or Google), whose terms also apply.</p>
 """
 RELAY_PROVIDERS = frozenset({"openrouter"})
+
+KEY_URLS = {
+    "openai": "https://platform.openai.com/api-keys",
+    "anthropic": "https://console.anthropic.com/settings/keys",
+    "gemini": "https://aistudio.google.com/apikey",
+    "openrouter": "https://openrouter.ai/keys",
+}
+
+# palette() colours follow the IDE's light or dark theme.
+PANEL_STYLE = """
+QLabel#paneTitle { font-weight: 600; padding-left: 4px; }
+QListWidget#chatList { border: none; background: transparent; outline: none; }
+QListWidget#chatList::item { padding: 6px 6px; border-radius: 6px; margin: 1px 0; }
+QListWidget#chatList::item:selected { background: palette(highlight); color: palette(highlighted-text); }
+QListWidget#chatList::item:hover:!selected { background: palette(alternate-base); }
+QToolButton#chip { border: 1px solid palette(mid); border-radius: 11px; padding: 2px 10px; }
+QToolButton#chip:hover { background: palette(alternate-base); }
+QFrame#composer { border: 1px solid palette(mid); border-radius: 8px; background: palette(base); }
+QPlainTextEdit#composerInput { border: none; background: transparent; }
+QFrame#keyBar { border: 1px solid palette(highlight); border-radius: 8px; }
+QLabel#disclaimer { color: palette(placeholder-text); font-size: 11px; }
+"""
+
+
+def _tool_button(text: str, tip: str) -> QToolButton:
+    button = QToolButton()
+    button.setText(text)
+    button.setToolTip(tip)
+    button.setAutoRaise(True)
+    button.setFixedSize(28, 28)
+    return button
+
+
+WELCOME = """<div style="margin-top: 28px">
+<p align="center" style="font-size: 15px"><b>Ask about your runs</b></p>
+<p align="center">Why did a run fail? How do two runs compare? What should I change next?</p>
+<p align="center" style="color: #888">The assistant reads configs, logs and metrics in this workspace and can plot \
+curves. It asks before it launches, stops or changes anything.</p>
+</div>"""
 
 DISCLAIMER = "AI can make mistakes. Check its answers and any change before you rely on them."
 
@@ -373,6 +414,8 @@ class AssistantPanel(QWidget):
         self._build_ui()
         self._load_selection()
         self._restore_last_chat()
+        if not self.entries:
+            self._render()  # the welcome text
 
         # Run watching: a local check of training runs' metrics; it never calls a model.
         self.watcher = RunWatcher()
@@ -386,58 +429,110 @@ class AssistantPanel(QWidget):
     # ── UI ──────────────────────────────────────────────────────────────────
 
     def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(8)
+        self.setStyleSheet(PANEL_STYLE)
+        outer = QHBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter.setChildrenCollapsible(False)
+        outer.addWidget(self.splitter)
+
+        # Saved chats, newest first: a list beside the conversation, shown with the ☰ button.
+        self.history_pane = QWidget()
+        history_layout = QVBoxLayout(self.history_pane)
+        history_layout.setContentsMargins(8, 10, 0, 10)
+        history_layout.setSpacing(6)
+        heading = QLabel("Chats")
+        heading.setObjectName("paneTitle")
+        history_layout.addWidget(heading)
+        self.history_list = QListWidget()
+        self.history_list.setObjectName("chatList")
+        self.history_list.setWordWrap(True)
+        self.history_list.setTextElideMode(Qt.TextElideMode.ElideRight)
+        self.history_list.itemClicked.connect(self._history_clicked)
+        self.history_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.history_list.customContextMenuRequested.connect(self._history_menu)
+        QShortcut(QKeySequence.StandardKey.Delete, self.history_list, activated=self._delete_selected_chat)
+        history_layout.addWidget(self.history_list, 1)
+        self.splitter.addWidget(self.history_pane)
+
+        main = QWidget()
+        layout = QVBoxLayout(main)
+        layout.setContentsMargins(10, 10, 10, 8)
+        layout.setSpacing(6)
+        self.splitter.addWidget(main)
+        self.splitter.setStretchFactor(0, 0)
+        self.splitter.setStretchFactor(1, 1)
 
         row = QHBoxLayout()
+        row.setSpacing(4)
+        self.history_toggle = _tool_button("☰", "Show or hide your saved chats")
+        self.history_toggle.setCheckable(True)
+        self.history_toggle.toggled.connect(self._set_history_visible)
         self.provider_box = QComboBox()
         for pid, cls in PROVIDERS.items():
             self.provider_box.addItem(cls.display_name, pid)
         self.provider_box.currentIndexChanged.connect(self._provider_changed)
         self.model_box = QComboBox()
         self.model_box.setEditable(True)
-        self.model_box.setMinimumWidth(160)
+        self.model_box.setMinimumWidth(120)
         self.model_box.setToolTip("Model id. Type any id the provider accepts, or press ↻ to list them.")
         self.model_box.currentTextChanged.connect(self._model_changed)
-        refresh = QPushButton("↻")
-        refresh.setToolTip("List the models available to this key")
-        refresh.setFixedWidth(32)
+        refresh = _tool_button("↻", "List the models available to this key")
         refresh.clicked.connect(self._refresh_models)
-        self.history_button = QToolButton()
-        self.history_button.setText("History")
-        self.history_button.setToolTip("Reopen a saved chat")
-        self.history_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.history_menu = QMenu(self.history_button)
-        self.history_menu.aboutToShow.connect(self._fill_history_menu)
-        self.history_button.setMenu(self.history_menu)
+        self.new_chat_button = _tool_button("＋", "New chat")
+        self.new_chat_button.clicked.connect(self.new_chat)
+        self.more_button = _tool_button("⋯", "API key, server and chat options")
+        self.more_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.more_menu = QMenu(self.more_button)
+        self.more_menu.aboutToShow.connect(self._fill_more_menu)
+        self.more_button.setMenu(self.more_menu)
+        row.addWidget(self.history_toggle)
         row.addWidget(self.provider_box)
         row.addWidget(self.model_box, 1)
         row.addWidget(refresh)
-        row.addWidget(self.history_button)
+        row.addWidget(self.new_chat_button)
+        row.addWidget(self.more_button)
         layout.addLayout(row)
 
-        key_row = QHBoxLayout()
-        self.key_label = QLabel()
-        self.key_label.setObjectName("muted")
-        self.key_button = QPushButton("Set API key…")
-        self.key_button.clicked.connect(self._set_key)
         self.base_url = QLineEdit()
         self.base_url.setPlaceholderText("Server URL")
+        self.base_url.setToolTip("Where this provider's API is served; leave empty for the default")
         self.base_url.editingFinished.connect(self._base_url_changed)
-        key_row.addWidget(self.key_label, 1)
-        key_row.addWidget(self.base_url, 1)
-        key_row.addWidget(self.key_button)
-        layout.addLayout(key_row)
+        layout.addWidget(self.base_url)
+
+        # Shown when the provider needs a key and has none, or when changing it: entered right here.
+        self.key_bar = QFrame()
+        self.key_bar.setObjectName("keyBar")
+        key_layout = QVBoxLayout(self.key_bar)
+        key_layout.setContentsMargins(10, 8, 10, 8)
+        key_layout.setSpacing(6)
+        self.key_prompt = QLabel()
+        self.key_prompt.setWordWrap(True)
+        self.key_prompt.setOpenExternalLinks(True)
+        key_layout.addWidget(self.key_prompt)
+        entry = QHBoxLayout()
+        self.key_input = QLineEdit()
+        self.key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.key_input.setClearButtonEnabled(True)
+        self.key_input.returnPressed.connect(self._save_key)
+        self.key_save = QPushButton("Save")
+        self.key_save.clicked.connect(self._save_key)
+        self.key_cancel = QPushButton("Cancel")
+        self.key_cancel.clicked.connect(self._cancel_key_edit)
+        entry.addWidget(self.key_input, 1)
+        entry.addWidget(self.key_save)
+        entry.addWidget(self.key_cancel)
+        key_layout.addLayout(entry)
+        self.key_note = QLabel()
+        self.key_note.setObjectName("muted")
+        self.key_note.setWordWrap(True)
+        key_layout.addWidget(self.key_note)
+        layout.addWidget(self.key_bar)
+        self._editing_key = False
 
         self.transcript = Transcript(lambda: self.entries, lambda: self._render(follow=False))
         self.transcript.setOpenLinks(False)  # tool lines are links that expand in place
         self.transcript.anchorClicked.connect(self._on_link)
-        self.transcript.setPlaceholderText(
-            "Ask about your runs: why one failed, how two compare, what to change next.\n\n"
-            "The assistant reads run configs, logs and metrics from this workspace, and can open files, "
-            "select and launch experiments, and stop runs (it asks first before starting or stopping compute)."
-        )
         self.alerts_box = QWidget()
         self.alerts_layout = QVBoxLayout(self.alerts_box)
         self.alerts_layout.setContentsMargins(0, 0, 0, 0)
@@ -447,39 +542,54 @@ class AssistantPanel(QWidget):
         layout.addWidget(self.alerts_box)
         layout.addWidget(self.transcript, 1)
 
-        quick = QHBoxLayout()
+        chips = QHBoxLayout()
+        chips.setSpacing(6)
+        self.prompt_chips: list[QToolButton] = []
         for title, prompt in QUICK_PROMPTS:
-            button = QPushButton(title)
-            button.clicked.connect(lambda _=False, p=prompt: self.ask(p))
-            quick.addWidget(button)
-        layout.addLayout(quick)
+            chip = QToolButton()
+            chip.setObjectName("chip")
+            chip.setText(title)
+            chip.setToolTip(prompt)
+            chip.setCursor(Qt.CursorShape.PointingHandCursor)
+            chip.clicked.connect(lambda _=False, p=prompt: self.ask(p))
+            chips.addWidget(chip)
+            self.prompt_chips.append(chip)
+        chips.addStretch(1)
+        layout.addLayout(chips)
 
+        composer = QFrame()
+        composer.setObjectName("composer")
+        composer_layout = QHBoxLayout(composer)
+        composer_layout.setContentsMargins(6, 4, 4, 4)
+        composer_layout.setSpacing(4)
         self.input = QPlainTextEdit()
+        self.input.setObjectName("composerInput")
         self.input.setPlaceholderText("Message the assistant (Ctrl+Enter to send)")
-        self.input.setFixedHeight(76)
-        layout.addWidget(self.input)
-        for keys in ("Ctrl+Return", "Ctrl+Enter"):
-            QShortcut(QKeySequence(keys), self.input, activated=self._send_clicked)
-
-        bottom = QHBoxLayout()
-        self.status = QLabel("")
-        self.status.setObjectName("muted")
-        new_chat = QPushButton("New chat")
-        new_chat.clicked.connect(self.new_chat)
+        self.input.setFixedHeight(64)
         self.send_button = QPushButton("Send")
         self.send_button.setDefault(True)
         self.send_button.clicked.connect(self._send_clicked)
-        bottom.addWidget(self.status, 1)
-        bottom.addWidget(new_chat)
-        bottom.addWidget(self.send_button)
-        layout.addLayout(bottom)
+        composer_layout.addWidget(self.input, 1)
+        composer_layout.addWidget(self.send_button, 0, Qt.AlignmentFlag.AlignBottom)
+        layout.addWidget(composer)
+        for keys in ("Ctrl+Return", "Ctrl+Enter"):
+            QShortcut(QKeySequence(keys), self.input, activated=self._send_clicked)
+
+        self.status = QLabel("")
+        self.status.setObjectName("muted")
+        self.status.setWordWrap(True)
+        layout.addWidget(self.status)
 
         self.disclaimer = QLabel(DISCLAIMER)
-        self.disclaimer.setObjectName("muted")
+        self.disclaimer.setObjectName("disclaimer")
         self.disclaimer.setWordWrap(True)
         self.disclaimer.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.disclaimer.setStyleSheet("font-size: 11px;")
         layout.addWidget(self.disclaimer)
+
+        visible = bool(self._setting("history_open", False))
+        self.history_toggle.setChecked(visible)
+        self._set_history_visible(visible)
+        self._refresh_history_list()
 
     # ── Provider selection & settings ───────────────────────────────────────
 
@@ -510,6 +620,7 @@ class AssistantPanel(QWidget):
         self.base_url.setText(urls.get(pid, ""))
         self.base_url.setPlaceholderText(cls.default_base_url)
         self.base_url.setVisible(pid == "ollama" or bool(urls.get(pid)))
+        self._editing_key = False
         self._update_key_status()
         self.agent = None  # rebuilt with the new provider on the next message; history is carried over
 
@@ -531,41 +642,116 @@ class AssistantPanel(QWidget):
 
     def _update_key_status(self) -> None:
         pid = self.provider_id
-        if not PROVIDERS[pid].requires_key:
-            self.key_label.setText("Local model: no key needed, nothing leaves this machine.")
-            self.key_button.setText("Set token…")
+        cls = PROVIDERS[pid]
+        missing = cls.requires_key and self.keys.source(pid) is None
+        shown = missing or self._editing_key
+        self.key_bar.setVisible(shown)
+        self.key_cancel.setVisible(self._editing_key and not missing)
+        self.more_button.setToolTip(f"{self._key_description()}\nAPI key, server and chat options")
+        if not shown:
             return
-        source = self.keys.source(pid)
-        if source == "keychain":
-            self.key_label.setText(f"Key {mask(self.keys.get(pid))} in the OS keychain")
-        elif source == "environment":
-            self.key_label.setText(f"Key from ${ENV_VARS[pid]}")
+        name = cls.display_name
+        link = KEY_URLS.get(pid)
+        if cls.requires_key:
+            get = f' <a href="{link}">Get a key ↗</a>' if link else ""
+            self.key_prompt.setText(f"<b>Add your {html.escape(name)} API key</b> to start chatting.{get}")
+            self.key_input.setPlaceholderText(f"Paste your {name} API key")
         else:
-            self.key_label.setText("No API key set")
-        self.key_button.setText("Change key…" if source == "keychain" else "Set API key…")
-
-    def _set_key(self) -> None:
-        pid = self.provider_id
-        name = PROVIDERS[pid].display_name
-        dialog = QInputDialog(self)
-        dialog.setWindowTitle(f"{name} API key")
-        dialog.setLabelText(
-            f"Paste your {name} API key. It is stored in the OS keychain, never in a file.\n"
-            "Leave empty and press OK to remove the saved key."
+            self.key_prompt.setText(f"<b>Token for your {html.escape(name)} server</b> (only if it requires one).")
+            self.key_input.setPlaceholderText("Paste a token, or leave empty to remove it")
+        env = ENV_VARS.get(pid, "")
+        self.key_note.setText(
+            "Saved in your system keychain, never in a file. "
+            + (f"Or set ${env} before starting ThetaIDE." if env else "")
         )
-        dialog.setTextEchoMode(QLineEdit.EchoMode.Password)
-        if not dialog.exec():
+
+    def _key_description(self) -> str:
+        pid = self.provider_id
+        if not PROVIDERS[pid].requires_key and not self.keys.source(pid):
+            return "Local model: no key needed, nothing leaves this machine."
+        return {
+            "session": f"Key {mask(self.keys.get(pid))} for this session only (not saved)",
+            "keychain": f"Key {mask(self.keys.get(pid))} in the system keychain",
+            "environment": f"Key from ${ENV_VARS.get(pid, '')}",
+        }.get(self.keys.source(pid) or "", "No API key set")
+
+    def edit_key(self) -> None:
+        self._editing_key = True
+        self._update_key_status()
+        self.key_input.setFocus()
+
+    def _cancel_key_edit(self) -> None:
+        self._editing_key = False
+        self.key_input.clear()
+        self._update_key_status()
+
+    def _save_key(self) -> None:
+        pid = self.provider_id
+        key = self.key_input.text().strip()
+        if not key and PROVIDERS[pid].requires_key:
+            self.key_input.setFocus()
             return
-        key = dialog.textValue().strip()
         try:
             if key:
                 self.keys.set(pid, key)
+                self.status.setText(f"{PROVIDERS[pid].display_name} key saved in the system keychain.")
             else:
                 self.keys.delete(pid)
         except KeyStoreError as exc:
-            QMessageBox.warning(self, "API key not saved", str(exc))
+            if not self._use_key_for_session(str(exc)):
+                return
+            self.keys.set_session(pid, key)
+            self.status.setText("Using this key until ThetaIDE closes. It was not saved.")
+        self.key_input.clear()
+        self._editing_key = False
         self.agent = None
         self._update_key_status()
+
+    def _use_key_for_session(self, reason: str) -> bool:
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle("No keychain available")
+        box.setText(reason)
+        box.setInformativeText(
+            "You can use the key until ThetaIDE closes without saving it. To save keys, install or start a "
+            "keychain (GNOME Keyring or KWallet), or set the provider's environment variable."
+        )
+        use = box.addButton("Use for this session", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton(QMessageBox.StandardButton.Cancel)
+        box.setDefaultButton(use)
+        box.exec()
+        return box.clickedButton() is use
+
+    def _remove_key(self) -> None:
+        self.keys.delete(self.provider_id)
+        self.agent = None
+        self._update_key_status()
+
+    def _fill_more_menu(self) -> None:
+        menu = self.more_menu
+        menu.clear()
+        pid = self.provider_id
+        menu.addAction(self._key_description()).setEnabled(False)
+        source = self.keys.source(pid)
+        label = "Set token…" if not PROVIDERS[pid].requires_key else ("Change API key…" if source else "Add API key…")
+        menu.addAction(label, self.edit_key)
+        if source in ("keychain", "session"):
+            menu.addAction("Remove saved key" if source == "keychain" else "Forget this key", self._remove_key)
+        server = menu.addAction("Custom server URL")
+        server.setCheckable(True)
+        server.setChecked(self.base_url.isVisible())
+        server.toggled.connect(self._toggle_base_url)
+        menu.addSeparator()
+        delete = menu.addAction("Delete this chat", self._delete_current_chat)
+        delete.setEnabled(bool(self.chat.history) and not self.busy)
+
+    def _toggle_base_url(self, shown: bool) -> None:
+        self.base_url.setVisible(shown)
+        if not shown and self.base_url.text().strip():
+            self.base_url.clear()
+            self._base_url_changed()
+        elif shown:
+            self.base_url.setFocus()
 
     def _provider_config(self) -> ProviderConfig:
         pid = self.provider_id
@@ -747,6 +933,7 @@ class AssistantPanel(QWidget):
             self.agent.history = self.history
         self.context.set_setting("last_chat", chat.id if chat.history else None)
         self.status.setText(f"Reopened “{chat.title}”" if chat.history else "")
+        self._refresh_history_list()
         self._render()
         self.transcript.verticalScrollBar().setValue(self.transcript.verticalScrollBar().maximum())
 
@@ -766,28 +953,64 @@ class AssistantPanel(QWidget):
         try:
             self.store.save(self.chat)
             self.context.set_setting("last_chat", self.chat.id)
+            self._refresh_history_list()
         except (OSError, TypeError, ValueError) as exc:
             self.status.setText(f"Could not save this chat: {exc}")
 
-    def _fill_history_menu(self) -> None:
+    def _set_history_visible(self, visible: bool) -> None:
+        self.history_pane.setVisible(visible)
+        if visible:
+            total = max(self.splitter.width(), 400)
+            pane = min(220, max(150, total // 3))
+            self.splitter.setSizes([pane, total - pane])
+            self._refresh_history_list()
+        self.context.set_setting("history_open", visible)
+
+    def _refresh_history_list(self) -> None:
         import datetime
 
-        self.history_menu.clear()
+        self.history_list.clear()
         chats = self.store.list()
         if not chats:
-            self.history_menu.addAction("No saved chats yet").setEnabled(False)
-        for summary in chats[:30]:
-            when = datetime.datetime.fromtimestamp(summary.updated).strftime("%b %d %H:%M")
-            action = self.history_menu.addAction(f"{summary.title}    ·  {when}")
-            action.setCheckable(summary.id == self.chat.id)
-            action.setChecked(summary.id == self.chat.id)
-            action.setEnabled(not self.busy)
-            action.triggered.connect(lambda _=False, cid=summary.id: self._open_saved(cid))
-        if self.chat.history:
-            self.history_menu.addSeparator()
-            delete = self.history_menu.addAction("Delete this chat")
-            delete.setEnabled(not self.busy)
-            delete.triggered.connect(self._delete_current_chat)
+            placeholder = QListWidgetItem("No saved chats yet")
+            placeholder.setFlags(Qt.ItemFlag.NoItemFlags)
+            self.history_list.addItem(placeholder)
+            return
+        for summary in chats[:100]:
+            when = datetime.datetime.fromtimestamp(summary.updated).strftime("%b %d, %H:%M")
+            item = QListWidgetItem(f"{summary.title}\n{when}")
+            item.setToolTip(summary.title)
+            item.setData(Qt.ItemDataRole.UserRole, summary.id)
+            self.history_list.addItem(item)
+            if summary.id == self.chat.id:
+                item.setSelected(True)
+                self.history_list.setCurrentItem(item)
+
+    def _history_clicked(self, item: QListWidgetItem) -> None:
+        chat_id = item.data(Qt.ItemDataRole.UserRole)
+        if not chat_id or chat_id == self.chat.id:
+            return
+        if self.busy:
+            self.status.setText("Wait for the reply to finish, or press Stop, before switching chats.")
+            self._refresh_history_list()
+            return
+        self._open_saved(chat_id)
+
+    def _history_menu(self, position) -> None:
+        item = self.history_list.itemAt(position)
+        chat_id = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        if not chat_id:
+            return
+        menu = QMenu(self.history_list)
+        menu.addAction("Open", lambda: self._history_clicked(item)).setEnabled(not self.busy)
+        menu.addAction("Delete", lambda: self._delete_chat(chat_id)).setEnabled(not self.busy)
+        menu.exec(self.history_list.viewport().mapToGlobal(position))
+
+    def _delete_selected_chat(self) -> None:
+        item = self.history_list.currentItem()
+        chat_id = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        if chat_id and not self.busy:
+            self._delete_chat(chat_id)
 
     def _open_saved(self, chat_id: str) -> None:
         try:
@@ -796,14 +1019,27 @@ class AssistantPanel(QWidget):
             QMessageBox.warning(self, "Could not open chat", str(exc))
 
     def _delete_current_chat(self) -> None:
-        self.store.delete(self.chat.id)
-        # Charts the assistant drew for this chat go with it; images the runs produced stay.
+        self._delete_chat(self.chat.id)
+
+    def _delete_chat(self, chat_id: str) -> None:
+        """Delete a saved chat and the charts the assistant drew for it; images the runs produced stay."""
+        if chat_id == self.chat.id:
+            entries = self.entries
+        else:
+            try:
+                entries = self.store.load(chat_id).entries
+            except (OSError, ValueError, KeyError):
+                entries = []
+        self.store.delete(chat_id)
         own = Path(self.bridge.figures_dir).resolve()
-        for entry in self.entries:
+        for entry in entries:
             path = Path(str(entry.get("path") or "")) if entry.get("kind") == "figure" else None
             if path is not None and path.resolve().is_relative_to(own):
                 path.unlink(missing_ok=True)
-        self._open_chat(Chat())
+        if chat_id == self.chat.id:
+            self._open_chat(Chat())
+        else:
+            self._refresh_history_list()
 
     # ── Worker events (GUI thread) ──────────────────────────────────────────
 
@@ -919,6 +1155,9 @@ class AssistantPanel(QWidget):
                 parts.append("> ⚠ **Error:** " + text)
             else:
                 parts.append("> " + text)
+        if not parts:
+            self.transcript.setHtml(WELCOME)  # wraps to the panel's width, unlike a placeholder
+            return
         self.transcript.setMarkdown("\n\n".join(p for p in parts if p))
         bar.setValue(bar.maximum() if at_bottom else position)
 
