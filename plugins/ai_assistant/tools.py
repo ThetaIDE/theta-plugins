@@ -352,7 +352,7 @@ def build_ide_tools(bridge: IDEBridge) -> ToolRegistry:
         if not any(series.values()):
             raise ToolError(f"No metrics were recorded for {', '.join(ids)}.")
         try:
-            path, names = plot_metrics(
+            path, panels = plot_metrics(
                 series,
                 metrics or [],
                 bridge.figures_dir,
@@ -362,15 +362,17 @@ def build_ide_tools(bridge: IDEBridge) -> ToolRegistry:
             )
         except PlotError as exc:
             raise ToolError(str(exc)) from exc
-        caption = title or f"{', '.join(names)} · {', '.join(ids)}"
+        caption = title or f"{', '.join(panels)} · {', '.join(ids)}"
+        drawn = [name for names in panels.values() for name in names]
         finals = {
             name: {rid: summarize_series(name, *series[rid][name]).get("last") for rid in ids if name in series[rid]}
-            for name in names
+            for name in drawn
         }
         return Shown(
             {
                 "shown_to_user": path.name,
-                "metrics": names,
+                "panels": {panel: names for panel, names in panels.items()},
+                "metrics": drawn,
                 "runs": ids,
                 "final_values": finals,
                 "note": "The user now sees this chart. You cannot see it: call get_run_metrics for trends.",
@@ -709,8 +711,10 @@ def build_ide_tools(bridge: IDEBridge) -> ToolRegistry:
     registry.register(
         Tool(
             "plot_metrics",
-            "Draw logged metrics as line charts (one panel per metric, one line per run) and show the chart "
-            "to the user inline in the chat. Use it when the user asks to see, plot or compare curves.",
+            "Draw logged metrics as line charts and show the chart to the user inline in the chat: one panel "
+            "per metric, one line per run, and one line per method when a run trained several (it logs "
+            "'<method>:<metric>', e.g. 'ppo:train/reward'; pass 'train/reward' to overlay every method). "
+            "Use it when the user asks to see, plot or compare curves.",
             _schema(
                 {
                     "run_ids": {

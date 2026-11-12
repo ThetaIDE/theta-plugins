@@ -3118,3 +3118,33 @@ def test_panel_buttons_use_the_plugins_svg_icons_and_follow_the_theme(tmp_path):
         assert colors["primary"] in panel.styleSheet()  # restyled from the theme's roles
     finally:
         close_panel(panel)
+
+
+def test_methods_in_one_run_are_overlaid_on_one_panel_per_metric(tmp_path):
+    from plugins.ai_assistant.figures import group_panels, matching_metrics, split_metric
+
+    steps = [0, 1, 2, 3]
+    run = {
+        "ppo:train/reward": (steps, [1, 2, 3, 4]),
+        "a2c:train/reward": (steps, [1, 1.5, 2, 2.5]),
+        "ppo:train/reward_std": (steps, [0.1] * 4),
+        "a2c:train/value_loss": (steps, [5, 4, 3, 2]),
+    }
+    assert split_metric("ppo:train/reward") == ("ppo", "train/reward")
+    assert split_metric("train/loss") == ("", "train/loss")
+    assert split_metric("eval/a:b") == ("", "eval/a:b")  # a slash before the colon is not a method
+    # An exact metric name brings every method's copy and nothing that merely contains it.
+    assert group_panels(matching_metrics({"r": run}, ["train/reward"])) == {
+        "train/reward": ["ppo:train/reward", "a2c:train/reward"]
+    }
+    assert list(group_panels(matching_metrics({"r": run}, ["loss"]))) == ["train/value_loss"]  # substring
+
+    bridge = FakeBridge()
+    bridge.figures_dir = tmp_path
+    bridge.run_metrics = lambda rid: run
+    result = run_tool(build_ide_tools(bridge), "plot_metrics", run_ids=["r1"], metrics=["train/reward"])
+    assert not result.is_error, result.content
+    reported = json.loads(result.content)
+    assert reported["panels"] == {"train/reward": ["ppo:train/reward", "a2c:train/reward"]}
+    assert reported["final_values"] == {"ppo:train/reward": {"r1": 4.0}, "a2c:train/reward": {"r1": 2.5}}
+    assert result.figures[0][1] == "train/reward · r1"

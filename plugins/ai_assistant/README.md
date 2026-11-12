@@ -53,7 +53,7 @@ The **Why did it fail?**, **Compare last two** and **Tune it** chips under the c
 | `compare_runs` | Which config values differ between 2–6 runs, and how their final metrics compare |
 | `list_experiments`, `list_configs`, `read_file` | Experiment configs, component configs (models, environments, agents, paradigms) and other text files. Access is limited to the workspace. |
 | `write_file`, `edit_file` | Create or change a workspace file, such as a new experiment config. **You approve or reject each change in a dialog that shows its diff.** YAML must parse before anything is saved, and `.git`, `.venv` and `.thetaide` are never written. |
-| `plot_metrics` | Draw logged metrics as line charts, one panel per metric and one line per run (up to six), with optional smoothing and a log axis. **The chart appears in the chat.** |
+| `plot_metrics` | Draw logged metrics as line charts, one panel per metric and one line per run (up to six). When a run trained several methods (`ppo:train/reward`, `a2c:train/reward`), each method is a line on the same panel. Optional smoothing and a log axis. **The chart appears in the chat.** |
 | `list_figures`, `show_figure` | Find the images a run produced (its results folder and `results/plots`) and show one in the chat. Only image files inside the workspace can be shown. |
 | `open_file`, `select_experiment` | Open a file in your editor; select an experiment in the tree |
 | `validate_experiment` | Compose and validate an experiment exactly as `run_pipeline.py` would, without running it: the errors, the resolved paradigm, environment and seed, and each method's effective settings. Writing an experiment file runs this automatically, so the assistant fixes errors before it calls the file ready. |
