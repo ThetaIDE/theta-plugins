@@ -24,7 +24,7 @@ When the chosen provider has no key, the panel asks for one right under the mode
 
 Keys go into the OS keychain through Python's `keyring` package: macOS Keychain, Windows Credential Locker, or the Secret Service (GNOME Keyring or KWallet) on Linux. They are never written to `settings.toml`, the plugin's JSON storage or any other file, and the UI shows only the last four characters.
 
-Window managers such as i3 or sway often have KWallet or GNOME Keyring installed but not running. The plugin starts it over D-Bus when it needs it, so saving works without extra setup. The first save may show the keychain's own prompt to create or unlock a wallet.
+Window managers such as i3 or sway often have KWallet or GNOME Keyring installed but not running. The plugin starts it over D-Bus when it needs it, so saving works without extra setup. The keychain is opened only when a key is needed: saving one, or sending the first message of a session. That is when the keychain may ask you to create or unlock a wallet; starting ThetaIDE never does. To know which providers have a saved key without opening the keychain, the plugin keeps their names (never the keys) in its settings.
 
 If there is no keychain at all, the plugin offers to use the key **for this session only**: it stays in memory until ThetaIDE closes and is never written to disk. To avoid entering it each time, set the provider's environment variable from the table above.
 

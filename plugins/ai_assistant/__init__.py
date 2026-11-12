@@ -36,6 +36,11 @@ class AIAssistantPlugin(Plugin):
         from .panel import AssistantPanel
 
         self.context = context
+        # Which providers have a keychain key (names only), so startup never opens the keychain.
+        self.keys.attach_index(
+            lambda: context.get_setting("keychain_keys", None),
+            lambda names: context.set_setting("keychain_keys", names),
+        )
         self.panel = AssistantPanel(context, self.keys)
         context.add_sidebar_tab(
             tab_id=TAB_ID,

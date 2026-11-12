@@ -4,6 +4,11 @@ Keys are never written to settings.toml, the plugin's JSON storage, or any other
 desktops that do not start a keychain themselves (i3, sway, a bare X session), the Secret Service
 is usually installed but asleep; it is started over D-Bus on first use. If no secure keychain is
 available at all, a key can be kept in memory for this session only; it is never written to disk.
+
+Opening a keychain can prompt the user (KWallet and GNOME Keyring ask to unlock or create a wallet), so
+the keychain is read only when a key is needed: sending a message or listing models. To know which
+providers have a key without reading it, the store keeps an index of provider names (never keys) in the
+plugin's settings.
 """
 
 from __future__ import annotations
@@ -101,6 +106,33 @@ class KeyStore:
         wakes = backend is None and not (env if env is not None else os.environ).get("PYTHON_KEYRING_BACKEND")
         self._waker = waker if waker is not None else (wake_secret_service if wakes else lambda: False)
         self._woken = False
+        self._cache: dict[str, str] = {}  # keychain values already read this session
+        self._load_index: Callable[[], Any] | None = None
+        self._save_index: Callable[[list[str]], None] | None = None
+
+    def attach_index(self, load: Callable[[], Any], save: Callable[[list[str]], None]) -> None:
+        """Where to keep the names of providers whose key is in the keychain (not the keys)."""
+        self._load_index, self._save_index = load, save
+
+    def _index(self) -> set[str] | None:
+        """Providers known to have a keychain key, or None when unknown (no index yet)."""
+        if self._load_index is None:
+            return None
+        value = self._load_index()
+        return None if value is None else {str(p) for p in value}
+
+    def _record(self, provider: str, present: bool) -> None:
+        if self._save_index is None:
+            return
+        index = self._index()
+        if index is None and not present:
+            return  # an unknown index stays unknown until a key is found or saved
+        index = set(index or ())
+        if (provider in index) != present:
+            index.symmetric_difference_update({provider})
+            self._save_index(sorted(index))
+        elif self._index() is None:
+            self._save_index(sorted(index))
 
     @property
     def backend(self) -> Any:
@@ -143,26 +175,57 @@ class KeyStore:
         return not module.startswith(_INSECURE_BACKENDS)
 
     def _keychain_value(self, provider: str) -> str | None:
+        """Read the keychain (this may show its unlock prompt). Cached for the session."""
+        if provider in self._cache:
+            return self._cache[provider]
         if self.backend is None:
             return None
         try:
-            return self.backend.get_password(SERVICE, self.username(provider)) or None
+            value = self.backend.get_password(SERVICE, self.username(provider)) or None
         except Exception:  # a locked or unreachable keychain must not crash the IDE
             return None
+        if value:
+            self._cache[provider] = value
+        self._record(provider, bool(value))
+        return value
+
+    def _in_keychain(self, provider: str) -> bool:
+        """Whether a keychain key exists, without opening the keychain when the index can answer."""
+        if provider in self._cache:
+            return True
+        index = self._index()
+        if index is not None:
+            return provider in index
+        if self._load_index is not None:
+            return False  # unknown: assume none rather than prompt; get() still looks when it matters
+        return bool(self._keychain_value(provider))
 
     def get(self, provider: str) -> str | None:
+        """The key to use. Reads the keychain if it may hold one, which can prompt to unlock it."""
+        if self._session.get(provider):
+            return self._session[provider]
+        index = self._index()
+        if index is None or provider in index or provider in self._cache:
+            value = self._keychain_value(provider)
+            if value:
+                return value
+        return self._env.get(ENV_VARS.get(provider, ""), "") or None
+
+    def peek(self, provider: str) -> str | None:
+        """The key if it is known without opening the keychain (for showing its last four characters)."""
         return (
             self._session.get(provider)
-            or self._keychain_value(provider)
-            or self._env.get(ENV_VARS.get(provider, ""), "")
+            or self._cache.get(provider)
+            or (None if self._in_keychain(provider) else self._env.get(ENV_VARS.get(provider, ""), ""))
             or None
         )
 
     def source(self, provider: str) -> str | None:
-        """Where the key in use comes from: 'session', 'keychain', 'environment', or None."""
+        """Where the key in use comes from: 'session', 'keychain', 'environment', or None. Never prompts
+        once the index exists."""
         if self._session.get(provider):
             return "session"
-        if self._keychain_value(provider):
+        if self._in_keychain(provider):
             return "keychain"
         if self._env.get(ENV_VARS.get(provider, "")):
             return "environment"
@@ -182,6 +245,8 @@ class KeyStore:
         except Exception as exc:
             raise KeyStoreError(f"The keychain refused the key: {exc}") from exc
         self._session.pop(provider, None)
+        self._cache[provider] = key
+        self._record(provider, True)
 
     def set_session(self, provider: str, key: str) -> None:
         """Use a key until ThetaIDE closes, without saving it anywhere."""
@@ -192,6 +257,8 @@ class KeyStore:
 
     def delete(self, provider: str) -> None:
         self._session.pop(provider, None)
+        self._cache.pop(provider, None)
+        self._record(provider, False)
         if self.backend is None:
             return
         try:

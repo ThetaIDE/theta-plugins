@@ -670,8 +670,8 @@ class AssistantPanel(QWidget):
         if not PROVIDERS[pid].requires_key and not self.keys.source(pid):
             return "Local model: no key needed, nothing leaves this machine."
         return {
-            "session": f"Key {mask(self.keys.get(pid))} for this session only (not saved)",
-            "keychain": f"Key {mask(self.keys.get(pid))} in the system keychain",
+            "session": f"Key {mask(self.keys.peek(pid))} for this session only (not saved)",
+            "keychain": " ".join(filter(None, ["Key", mask(self.keys.peek(pid)), "saved in the system keychain"])),
             "environment": f"Key from ${ENV_VARS.get(pid, '')}",
         }.get(self.keys.source(pid) or "", "No API key set")
 
@@ -753,12 +753,13 @@ class AssistantPanel(QWidget):
         elif shown:
             self.base_url.setFocus()
 
-    def _provider_config(self) -> ProviderConfig:
+    def _provider_config(self, with_key: bool = True) -> ProviderConfig:
+        """with_key=False leaves the keychain closed (it may prompt to unlock); only requests need the key."""
         pid = self.provider_id
         urls = self._setting("base_urls", {}) or {}
         return ProviderConfig(
             model=self.model_box.currentText().strip() or PROVIDERS[pid].default_model,
-            api_key=self.keys.get(pid),
+            api_key=self.keys.get(pid) if with_key else None,
             base_url=urls.get(pid) or None,
         )
 
@@ -767,7 +768,7 @@ class AssistantPanel(QWidget):
     def destination(self) -> str | None:
         """The host the current provider sends data to, or None when it runs on this computer."""
         cls = PROVIDERS[self.provider_id]
-        host = (urlparse(self._provider_config().base_url or cls.default_base_url).hostname or "").lower()
+        host = (urlparse(self._provider_config(with_key=False).base_url or cls.default_base_url).hostname or "").lower()
         return None if host in LOCAL_HOSTS or host.startswith("127.") else host
 
     def _data_sharing_allowed(self) -> bool:
@@ -1114,7 +1115,7 @@ class AssistantPanel(QWidget):
             return usage.cost
         if self.provider_id in FREE_PROVIDERS:
             return None
-        model = self.agent.provider.config.model if self.agent is not None else self._provider_config().model
+        model = self.agent.provider.config.model if self.agent is not None else self._provider_config(False).model
         return estimate(usage, model, self._setting("prices", {}) or {})
 
     def _on_failed(self, message: str) -> None:

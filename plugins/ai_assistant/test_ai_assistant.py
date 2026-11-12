@@ -2852,7 +2852,7 @@ def make_panel(tmp_path, keys, settings=None):
         window = SimpleNamespace(runs=[], selected=None, active_runs=[], current_experiment=None)
 
         def __init__(self):
-            self.settings = dict(settings or {})
+            self.settings = settings if settings is not None else {}  # shared with the caller
 
         def get_workspace_dir(self):
             return tmp_path
@@ -2987,5 +2987,73 @@ def test_quick_prompts_are_compact_chips_not_full_width_buttons(tmp_path):
         used = sum(c.width() for c in chips)
         assert used < panel.transcript.width() * 0.6  # they keep their natural size, left-aligned
         assert chips[0].x() < chips[1].x() < chips[2].x() and chips[0].x() < 40
+    finally:
+        close_panel(panel)
+
+
+class CountingKeychain(FakeKeychain):
+    """Records every read: on a real desktop each one may pop up KWallet's or GNOME Keyring's unlock prompt."""
+
+    def __init__(self):
+        super().__init__()
+        self.reads: list[str] = []
+
+    def get_password(self, service, user):
+        self.reads.append(user)
+        return super().get_password(service, user)
+
+
+def indexed_keys(keychain, settings, env=None):
+    keys = KeyStore(backend=keychain, env=env or {})
+    keys.attach_index(lambda: settings.get("keychain_keys"), lambda names: settings.update(keychain_keys=names))
+    return keys
+
+
+def test_the_keychain_index_holds_provider_names_never_keys():
+    keychain, settings = CountingKeychain(), {}
+    keys = indexed_keys(keychain, settings, env={"OPENAI_API_KEY": "sk-env-0000"})
+    keys.set("openrouter", "sk-or-secret-1234")
+    assert settings == {"keychain_keys": ["openrouter"]}
+    assert "sk-or-secret-1234" not in json.dumps(settings)
+
+    fresh = indexed_keys(keychain, settings, env={"OPENAI_API_KEY": "sk-env-0000"})  # next IDE start
+    keychain.reads.clear()
+    assert fresh.source("openrouter") == "keychain" and fresh.peek("openrouter") is None
+    assert fresh.source("openai") == "environment" and fresh.get("openai") == "sk-env-0000"
+    assert keychain.reads == []  # answered from the index: no unlock prompt
+    assert fresh.get("openrouter") == "sk-or-secret-1234"  # only now, to send a request
+    fresh.get("openrouter")
+    assert keychain.reads == ["openrouter-api-key"]  # once per session
+    fresh.delete("openrouter")
+    assert settings == {"keychain_keys": []} and fresh.source("openrouter") is None
+
+
+def test_without_an_index_yet_a_key_saved_earlier_is_still_found_when_sending():
+    keychain, settings = CountingKeychain(), {}
+    keychain.store[("ThetaIDE", "gemini-api-key")] = "AIza-old-key-5678"  # saved by an older version
+    keys = indexed_keys(keychain, settings)
+    assert keys.source("gemini") is None and keychain.reads == []  # unknown: no prompt at startup
+    assert keys.get("gemini") == "AIza-old-key-5678"
+    assert settings == {"keychain_keys": ["gemini"]} and keys.source("gemini") == "keychain"
+
+
+def test_starting_the_panel_does_not_open_the_keychain(tmp_path):
+    from PyQt6.QtWidgets import QApplication
+
+    app = QApplication.instance() or QApplication([])
+    keychain = CountingKeychain()
+    keychain.store[("ThetaIDE", "openrouter-api-key")] = "sk-or-secret-1234"
+    settings = {"provider": "openrouter", "keychain_keys": ["openrouter"]}
+    panel = make_panel(tmp_path, indexed_keys(keychain, settings), settings)
+    try:
+        panel.show()
+        app.processEvents()
+        panel._fill_more_menu()
+        assert not panel.key_bar.isVisible()
+        assert panel._key_description() == "Key saved in the system keychain"
+        assert panel.destination() == "openrouter.ai"
+        assert keychain.reads == []  # no unlock prompt at startup
+        assert panel._provider_config().api_key == "sk-or-secret-1234"  # sending reads it
+        assert keychain.reads == ["openrouter-api-key"] and "1234" in panel._key_description()
     finally:
         close_panel(panel)
