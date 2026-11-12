@@ -12,11 +12,12 @@ import json
 import re
 import threading
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 from PyQt6.QtCore import QObject, Qt, QThread, QTimer, QUrl, pyqtSignal, pyqtSlot
-from PyQt6.QtGui import QDesktopServices, QKeySequence, QShortcut
+from PyQt6.QtGui import QDesktopServices, QImage, QKeySequence, QShortcut, QTextDocument
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -83,6 +84,75 @@ def chats_folder(context: Any):
     paths = getattr(context.window, "workspace_paths", None)
     base = Path(paths.data_dir) if paths is not None else Path(context.get_data_dir())
     return base / "assistant" / "chats"
+
+
+def _escape_markdown(text: str) -> str:
+    return re.sub(r"([\\`*_\[\]<>#|])", r"\\\1", text)
+
+
+def figure_markdown(index: int, entry: dict) -> str:
+    """A figure entry: the image (click to open it full size) and its caption."""
+    path = str(entry.get("path") or "")
+    caption = _escape_markdown(entry.get("text") or Path(path).name)
+    if not Path(path).is_file():
+        return f"> 🖼 *{caption}* (the image file no longer exists)"
+    url = bytes(QUrl.fromLocalFile(path).toEncoded()).decode()
+    return f"[![{caption}](figure:{index})]({url})\n\n*{caption}* · [open]({url})"
+
+
+class Transcript(QTextBrowser):
+    """The chat view. It loads only the chat's own figures (figure:<entry index>), scaled to fit the width;
+    other image references in model text load nothing, so a reply cannot pull arbitrary files into view."""
+
+    def __init__(self, entries: Callable[[], list[dict]], rerender: Callable[[], None], parent=None):
+        super().__init__(parent)
+        self._entries = entries
+        self._rerender = rerender
+        self._cache: dict[tuple, QImage] = {}
+        self._laid_out_width = 0
+
+    def figure_width(self) -> int:
+        return max(160, self.viewport().width() - 28)
+
+    def loadResource(self, kind: int, url: QUrl) -> Any:  # noqa: N802  (Qt override)
+        if kind != QTextDocument.ResourceType.ImageResource.value:
+            return super().loadResource(kind, url)
+        if url.scheme() != "figure":
+            return QImage()
+        try:
+            entry = self._entries()[int(url.path())]
+        except (ValueError, IndexError):
+            return QImage()
+        return self.figure(str(entry.get("path") or ""))
+
+    def figure(self, path: str) -> QImage:
+        try:
+            mtime = Path(path).stat().st_mtime
+        except OSError:
+            return QImage()
+        width = self.figure_width()
+        key = (path, mtime, width)
+        if key not in self._cache:
+            image = QImage(path)
+            if not image.isNull():
+                # Show at its own size, or the panel's width if narrower; keep full detail on HiDPI screens.
+                target = min(image.width(), width)
+                pixels = int(target * (self.devicePixelRatioF() or 1.0))
+                if image.width() > pixels:
+                    image = image.scaledToWidth(pixels, Qt.TransformationMode.SmoothTransformation)
+                image.setDevicePixelRatio(image.width() / target)
+            if len(self._cache) > 64:
+                self._cache.clear()
+            self._cache[key] = image
+        self._laid_out_width = width
+        return self._cache[key]
+
+    def resizeEvent(self, event) -> None:  # noqa: N802  (Qt override)
+        super().resizeEvent(event)
+        has_figures = any(e.get("kind") == "figure" for e in self._entries())
+        if has_figures and abs(self.figure_width() - self._laid_out_width) > 24:
+            self._laid_out_width = self.figure_width()
+            self._rerender()
 
 
 def _code_block(text: str, language: str = "") -> str:
@@ -266,6 +336,7 @@ class AssistantPanel(QWidget):
         self.context = context
         self.keys = keys
         self.bridge = WindowBridge(context.window, workspace_root(context))
+        self.bridge.figures_dir = chats_folder(context).parent / "figures"
         self.tools: ToolRegistry = build_ide_tools(self.bridge)
         self.invoker = MainThreadInvoker(self)
         self.agent: Agent | None = None
@@ -359,7 +430,7 @@ class AssistantPanel(QWidget):
         key_row.addWidget(self.key_button)
         layout.addLayout(key_row)
 
-        self.transcript = QTextBrowser()
+        self.transcript = Transcript(lambda: self.entries, lambda: self._render(follow=False))
         self.transcript.setOpenLinks(False)  # tool lines are links that expand in place
         self.transcript.anchorClicked.connect(self._on_link)
         self.transcript.setPlaceholderText(
@@ -726,6 +797,12 @@ class AssistantPanel(QWidget):
 
     def _delete_current_chat(self) -> None:
         self.store.delete(self.chat.id)
+        # Charts the assistant drew for this chat go with it; images the runs produced stay.
+        own = Path(self.bridge.figures_dir).resolve()
+        for entry in self.entries:
+            path = Path(str(entry.get("path") or "")) if entry.get("kind") == "figure" else None
+            if path is not None and path.resolve().is_relative_to(own):
+                path.unlink(missing_ok=True)
         self._open_chat(Chat())
 
     # ── Worker events (GUI thread) ──────────────────────────────────────────
@@ -766,6 +843,8 @@ class AssistantPanel(QWidget):
                 entry["text"] += f" — failed: {first}" if result.is_error else " ✓"
                 entry["result"], entry["is_error"] = result.content, result.is_error
                 break
+        for path, caption in getattr(result, "figures", ()):
+            self.entries.append({"kind": "figure", "text": caption, "path": path})
         self._append("assistant", "")
 
     def _on_link(self, url: QUrl) -> None:
@@ -834,6 +913,8 @@ class AssistantPanel(QWidget):
                 parts.append(f"> [{marker} 🔧 {label}](tool:{index})")
                 if entry.get("open"):
                     parts.append(tool_details(entry))
+            elif kind == "figure":
+                parts.append(figure_markdown(index, entry))
             elif kind == "error":
                 parts.append("> ⚠ **Error:** " + text)
             else:

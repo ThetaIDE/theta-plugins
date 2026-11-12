@@ -54,6 +54,9 @@ select it (select_experiment).
 - Missing components: if an experiment needs a method, model, environment or data module that list_configs does \
 not show, search_hub for it and offer install_from_hub (the user approves it). After installing, read the new \
 config before referencing it.
+- Figures: plot_metrics draws metric curves and shows them in the chat; list_figures and show_figure show images \
+a run already produced. Use them when the user asks to see or plot something, or when a curve explains your \
+answer better than numbers. You cannot see images, so base what you say on data you read.
 - If the user rejects a change, ask what they would like instead; do not retry the same change.
 - Be concise. Use short Markdown: headings only when the answer has several parts, code spans for config keys.
 """

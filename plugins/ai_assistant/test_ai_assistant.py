@@ -2633,3 +2633,148 @@ def test_openrouter_data_sharing_notice_says_it_forwards_requests(monkeypatch, t
         panel.shutdown()
         panel.deleteLater()
         app.processEvents()
+
+
+# ── Figures in the chat ──────────────────────────────────────────────────────
+
+
+def run_tool(registry, name, **arguments):
+    return registry.execute(ToolCall("c1", name, arguments))
+
+
+def test_plot_metrics_draws_a_png_for_the_user_and_tells_the_model_what_it_shows(tmp_path):
+    bridge = FakeBridge()
+    bridge.figures_dir = tmp_path / "figures"
+    result = run_tool(build_ide_tools(bridge), "plot_metrics", run_ids=["r1", "r2"], metrics=["loss"], smooth=2)
+    assert not result.is_error, result.content
+    [(path, caption)] = result.figures
+    assert Path(path).parent == bridge.figures_dir and Path(path).read_bytes().startswith(b"\x89PNG")
+    assert caption == "train/loss · r1, r2"
+    reported = json.loads(result.content)
+    assert reported["metrics"] == ["train/loss"] and reported["runs"] == ["r1", "r2"]
+    assert reported["final_values"]["train/loss"]["r1"] == pytest.approx(0.28)
+    assert path not in result.content  # the model gets data, not the user's file system
+
+
+def test_plot_metrics_names_what_exists_when_nothing_matches(tmp_path):
+    bridge = FakeBridge()
+    bridge.figures_dir = tmp_path
+    result = run_tool(build_ide_tools(bridge), "plot_metrics", metrics=["reward"])
+    assert result.is_error and "Available: train/loss" in result.content and not result.figures
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_window_bridge_finds_a_runs_images_and_shows_only_workspace_images(tmp_path):
+    folder = tmp_path / "results" / "logs" / "dnn" / "baseline"
+    plots = tmp_path / "results" / "plots" / "dnn" / "baseline_20261112"
+    for directory in (folder, plots):
+        directory.mkdir(parents=True)
+    (folder / "confusion.png").write_bytes(b"\x89PNG")
+    (folder / "metrics.csv").write_text("step,loss\n")
+    (plots / "curves.svg").write_text("<svg/>")
+    run = {"id": "r1", "backend": {"group": "dnn", "experiment_id": "baseline"}}
+    window = SimpleNamespace(runs=[run], run_folder=lambda r: folder)
+    bridge = WindowBridge(window, tmp_path)
+
+    found = sorted(f["path"] for f in bridge.run_figures("r1"))
+    assert found == ["results/logs/dnn/baseline/confusion.png", "results/plots/dnn/baseline_20261112/curves.svg"]
+
+    result = run_tool(build_ide_tools(bridge), "show_figure", path=found[0], caption="Confusion matrix")
+    assert not result.is_error
+    assert result.figures == ((str(folder / "confusion.png"), "Confusion matrix"),)
+    outside = tmp_path.parent / "elsewhere.png"
+    outside.write_bytes(b"\x89PNG")
+    for path, message in [
+        (str(outside), "outside the workspace"),
+        ("results/logs/dnn/baseline/metrics.csv", "not an image"),
+        ("results/missing.png", "No file"),
+    ]:
+        result = run_tool(build_ide_tools(bridge), "show_figure", path=path)
+        assert result.is_error and message in result.content and not result.figures
+
+
+def test_eval_bridge_supports_the_figure_tools():
+    from plugins.ai_assistant.evals.harness import ScenarioBridge
+    from plugins.ai_assistant.tools import ToolError
+
+    bridge = ScenarioBridge(SCENARIOS[0].workspace)
+    assert bridge.run_figures("anything") == []
+    with pytest.raises(ToolError):
+        bridge.figure_path("plots/x.png")
+
+
+def test_chat_shows_figures_inline_scaled_to_the_panel_and_deleting_the_chat_removes_its_charts(monkeypatch, tmp_path):
+    import os
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PyQt6.QtCore import QUrl
+    from PyQt6.QtGui import QImage, QTextDocument
+    from PyQt6.QtWidgets import QApplication
+
+    from plugins.ai_assistant import panel as panel_module
+    from plugins.ai_assistant.figures import plot_metrics
+    from plugins.ai_assistant.tools import ToolResult
+
+    app = QApplication.instance() or QApplication([])
+
+    class Context:
+        window = SimpleNamespace(runs=[], selected=None, active_runs=[], current_experiment=None)
+        settings: dict = {}
+
+        def get_workspace_dir(self):
+            return tmp_path
+
+        def get_data_dir(self):
+            return tmp_path / ".thetaide"
+
+        def get_setting(self, key, default=None):
+            return self.settings.get(key, default)
+
+        def set_setting(self, key, value):
+            self.settings[key] = value
+
+    panel = panel_module.AssistantPanel(Context(), KeyStore(backend=FakeKeychain(), env={}))
+    try:
+        panel.resize(420, 700)
+        panel.show()
+        app.processEvents()
+        assert panel.bridge.figures_dir == tmp_path / ".thetaide" / "assistant" / "figures"
+        chart, _ = plot_metrics({"r1": FakeBridge().run_metrics("r1")}, [], panel.bridge.figures_dir)
+        run_image = tmp_path / "results" / "run.png"
+        run_image.parent.mkdir()
+        QImage(30, 20, QImage.Format.Format_RGB32).save(str(run_image))
+
+        call = ToolCall("c1", "plot_metrics", {})
+        panel._on_tool_started(call, False)
+        panel._on_tool_finished(call, ToolResult("{}", figures=((str(chart), "train/loss · r1"),)))
+        call = ToolCall("c2", "show_figure", {"path": "results/run.png"})
+        panel._on_tool_started(call, False)
+        panel._on_tool_finished(call, ToolResult("ok", figures=((str(run_image), "Run image"),)))
+        panel._done("")
+        figures = [i for i, e in enumerate(panel.entries) if e["kind"] == "figure"]
+        assert [panel.entries[i]["text"] for i in figures] == ["train/loss · r1", "Run image"]
+
+        text = panel.transcript.toPlainText()
+        assert "train/loss · r1" in text and "Run image" in text
+        load = panel.transcript.loadResource
+        kind = QTextDocument.ResourceType.ImageResource.value
+        big = load(kind, QUrl(f"figure:{figures[0]}"))
+        small = load(kind, QUrl(f"figure:{figures[1]}"))
+        assert not big.isNull() and not small.isNull()
+        logical = lambda image: image.width() / image.devicePixelRatio()  # noqa: E731
+        assert logical(big) == pytest.approx(panel.transcript.figure_width(), abs=1)  # wide chart fits the panel
+        assert logical(small) == pytest.approx(30)  # small images are not blown up
+        # Model text cannot pull files into view with Markdown image syntax.
+        assert load(kind, QUrl.fromLocalFile(str(run_image))).isNull()
+
+        # Reopening works from the saved chat; a vanished file shows a note instead of a broken image.
+        run_image.unlink()
+        panel._render()
+        assert "the image file no longer exists" in panel.transcript.toPlainText()
+
+        panel._delete_current_chat()
+        assert not chart.exists()  # the assistant's own chart went with the chat
+    finally:
+        panel.shutdown()
+        panel.deleteLater()
+        app.processEvents()

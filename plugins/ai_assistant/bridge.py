@@ -12,6 +12,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from .figures import find_images, is_image
 from .tools import ToolError
 from .watch import WatchTarget
 
@@ -126,6 +127,8 @@ class WindowBridge:
         # bridge from the worker thread and use this for anything that touches widgets.
         self.on_gui = lambda fn: fn()
         self.compose = self._compose_with_backend
+        # Charts the assistant draws; the panel points this at <data dir>/assistant/figures.
+        self.figures_dir = self.workspace / ".thetaide" / "assistant" / "figures"
 
     # ── Reading ─────────────────────────────────────────────────────────────
 
@@ -343,6 +346,30 @@ class WindowBridge:
         if b"\0" in data[:4096]:
             raise ToolError(f"{path} is a binary file.")
         return data.decode("utf-8", errors="replace")
+
+    def run_figures(self, run_id: str) -> list[dict[str, Any]]:
+        run = self._run(run_id)
+        folders = [f for f in [self._run_folder(run)] if f is not None]
+        backend = run.get("backend") or {}
+        if backend.get("group") and backend.get("experiment_id"):
+            # Plotters write to results/plots/<group>/<result id>; the result id starts with the experiment id.
+            plots = self.workspace / "results" / "plots" / str(backend["group"])
+            if plots.is_dir():
+                folders += sorted(plots.glob(f"{backend['experiment_id']}*"))
+        return find_images(folders, self.workspace)
+
+    def figure_path(self, path: str) -> Path:
+        candidate = Path(path).expanduser()
+        figures = Path(self.figures_dir).resolve()
+        if candidate.is_absolute() and candidate.resolve().is_relative_to(figures):
+            resolved = candidate.resolve()  # the assistant's own charts may live outside the workspace
+        else:
+            resolved = self._resolve(path)
+        if not resolved.is_file():
+            raise ToolError(f"No file at {path}.")
+        if not is_image(resolved):
+            raise ToolError(f"{path} is not an image (expected PNG, JPG, GIF, BMP, SVG or WebP).")
+        return resolved
 
     # ── Validation (called on the worker thread) ────────────────────────────
 

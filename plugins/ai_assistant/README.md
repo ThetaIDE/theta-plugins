@@ -43,6 +43,8 @@ A line under the message box says so. The assistant's diagnoses, comparisons and
 | `compare_runs` | Which config values differ between 2–6 runs, and how their final metrics compare |
 | `list_experiments`, `list_configs`, `read_file` | Experiment configs, component configs (models, environments, agents, paradigms) and other text files. Access is limited to the workspace. |
 | `write_file`, `edit_file` | Create or change a workspace file, such as a new experiment config. **You approve or reject each change in a dialog that shows its diff.** YAML must parse before anything is saved, and `.git`, `.venv` and `.thetaide` are never written. |
+| `plot_metrics` | Draw logged metrics as line charts, one panel per metric and one line per run (up to six), with optional smoothing and a log axis. **The chart appears in the chat.** |
+| `list_figures`, `show_figure` | Find the images a run produced (its results folder and `results/plots`) and show one in the chat. Only image files inside the workspace can be shown. |
 | `open_file`, `select_experiment` | Open a file in your editor; select an experiment in the tree |
 | `validate_experiment` | Compose and validate an experiment exactly as `run_pipeline.py` would, without running it: the errors, the resolved paradigm, environment and seed, and each method's effective settings. Writing an experiment file runs this automatically, so the assistant fixes errors before it calls the file ready. |
 | `search_hub` | Search the Theta Component Hub for methods, models, environments, data modules, evaluators and suites, and see which are installed |
@@ -50,6 +52,10 @@ A line under the message box says so. The assistant's diagnoses, comparisons and
 | `launch_experiment`, `stop_run` | Start or stop compute. **Each one asks for your confirmation first.** |
 
 Paths that start with a config group (`experiment/`, `model/`, …) refer to `in/config`. Other relative paths are relative to the workspace root. The **Launch and stop runs without asking** setting never covers file changes or Hub installs.
+
+### Figures in the chat
+
+Ask to *plot the reward of my last two runs* or *show the confusion matrix* and the image appears in the chat, scaled to the panel. Click it, or **open**, to see it full size in your image viewer. Charts the assistant draws are saved under `.thetaide/assistant/figures` and are deleted with their chat. The model does not see the images; it describes curves from the metric data it reads. Charts are drawn with matplotlib, which ThetaIDE already includes.
 
 A run id may be `selected` (the run open in the Training Monitor) or `latest`. **Ask AI about this run** in the Training Monitor footer, and the launcher command **AI: Explain the selected run**, both diagnose the selected run.
 

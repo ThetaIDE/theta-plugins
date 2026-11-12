@@ -8,9 +8,11 @@ Actions are never carried out: an approval request is recorded and declined.
 from __future__ import annotations
 
 import re
+import tempfile
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from ..agent import Agent, TextDelta, ToolFinished, ToolStarted, TurnFinished
@@ -60,6 +62,18 @@ class ScenarioBridge:
 
     def run_metrics(self, run_id: str) -> dict[str, tuple[list[Any], list[Any]]]:
         return {k: (list(s), list(v)) for k, (s, v) in self.workspace["metrics"].get(run_id, {}).items()}
+
+    # Charts drawn during an eval go to a scratch folder; scenario runs have no image files of their own.
+    figures_dir = Path(tempfile.gettempdir()) / "thetaide-ai-eval-figures"
+
+    def run_figures(self, run_id: str) -> list[dict[str, Any]]:
+        return []
+
+    def figure_path(self, path: str) -> Path:
+        candidate = Path(path)
+        if candidate.is_file() and candidate.resolve().is_relative_to(self.figures_dir.resolve()):
+            return candidate
+        raise ToolError(f"No image at {path}. Call list_figures, or plot_metrics to draw one.")
 
     @property
     def files(self) -> dict[str, str]:

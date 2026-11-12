@@ -10,6 +10,7 @@ import difflib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 
 from .analysis import (
@@ -19,6 +20,7 @@ from .analysis import (
     summarize_series,
     truncate,
 )
+from .figures import PlotError, plot_metrics
 from .providers.chat_types import ToolCall, ToolSpec
 
 MAX_RESULT_CHARS = 12_000
@@ -85,6 +87,17 @@ class IDEBridge(Protocol):
 
     def hub_install(self, component_id: str, version: str | None = None) -> str: ...
 
+    # Where the assistant saves the charts it draws.
+    figures_dir: Path
+
+    def run_figures(self, run_id: str) -> list[dict[str, Any]]:
+        """Image files a run produced (its results folder and results/plots), newest first."""
+        ...
+
+    def figure_path(self, path: str) -> Path:
+        """An existing image file in the workspace (or figures_dir); ToolError otherwise."""
+        ...
+
 
 class ToolError(Exception):
     """A failure the model should see and can correct (unknown run id, bad path)."""
@@ -112,6 +125,16 @@ class Tool:
 class ToolResult:
     content: str
     is_error: bool = False
+    # Images shown to the user under the tool line, as (absolute path, caption). The model sees only content.
+    figures: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True)
+class Shown:
+    """What a tool handler returns to also show images: the model gets `value`, the user sees `figures`."""
+
+    value: Any
+    figures: tuple[tuple[str, str], ...]
 
 
 def _schema(properties: dict[str, Any] | None = None, required: list[str] | None = None) -> dict[str, Any]:
@@ -179,12 +202,15 @@ class ToolRegistry:
         try:
             arguments = self._arguments(tool, call)
             value = tool.handler(**arguments)
+            figures: tuple[tuple[str, str], ...] = ()
+            if isinstance(value, Shown):
+                value, figures = value.value, value.figures
         except ToolError as exc:
             return ToolResult(str(exc), is_error=True)
         except Exception as exc:  # a tool bug must not end the conversation
             return ToolResult(f"{type(exc).__name__}: {exc}", is_error=True)
         text = value if isinstance(value, str) else json.dumps(value, indent=1, default=str)
-        return ToolResult(truncate(text, MAX_RESULT_CHARS))
+        return ToolResult(truncate(text, MAX_RESULT_CHARS), figures=figures)
 
 
 # ── The ThetaIDE tool set ────────────────────────────────────────────────────
@@ -298,6 +324,59 @@ def build_ide_tools(bridge: IDEBridge) -> ToolRegistry:
 
     def list_configs(group: str = "") -> dict:
         return bridge.config_files(group)
+
+    def list_figures(run_id: str = "selected") -> dict:
+        rid = resolve(run_id)
+        figures = bridge.run_figures(rid)
+        if not figures:
+            return {"run_id": rid, "figures": [], "note": "This run has no image files. plot_metrics can draw one."}
+        return {"run_id": rid, "figures": figures}
+
+    def show_figure(path: str, caption: str = "") -> Shown:
+        image = bridge.figure_path(path)
+        return Shown(
+            f"Shown to the user in the chat: {path}. You cannot see the image; describe it only from data you "
+            "have read (get_run_metrics), not by guessing.",
+            ((str(image), caption or image.name),),
+        )
+
+    def plot_metrics_tool(
+        run_ids: list[str] | None = None,
+        metrics: list[str] | None = None,
+        title: str = "",
+        smooth: int = 0,
+        log_y: bool = False,
+    ) -> Shown:
+        ids = [resolve(r) for r in (run_ids or ["selected"])[:6]]
+        series = {rid: bridge.run_metrics(rid) for rid in ids}
+        if not any(series.values()):
+            raise ToolError(f"No metrics were recorded for {', '.join(ids)}.")
+        try:
+            path, names = plot_metrics(
+                series,
+                metrics or [],
+                bridge.figures_dir,
+                title=title,
+                smooth=max(0, min(int(smooth or 0), 500)),
+                log_y=bool(log_y),
+            )
+        except PlotError as exc:
+            raise ToolError(str(exc)) from exc
+        caption = title or f"{', '.join(names)} · {', '.join(ids)}"
+        finals = {
+            name: {rid: summarize_series(name, *series[rid][name]).get("last") for rid in ids if name in series[rid]}
+            for name in names
+        }
+        return Shown(
+            {
+                "shown_to_user": path.name,
+                "metrics": names,
+                "runs": ids,
+                "final_values": finals,
+                "note": "The user now sees this chart. You cannot see it: call get_run_metrics for trends.",
+            },
+            ((str(path), caption),),
+        )
 
     def replaced(path: str, old_text: str, new_text: str) -> tuple[str, str]:
         current = bridge.existing_text(path)
@@ -602,6 +681,54 @@ def build_ide_tools(bridge: IDEBridge) -> ToolRegistry:
             mutating=True,
             preview=install_preview,
             background=True,
+        )
+    )
+    registry.register(
+        Tool(
+            "list_figures",
+            "Image files (plots, figures) a run produced, newest first. Show one with show_figure.",
+            _schema({"run_id": RUN_ID}),
+            list_figures,
+        )
+    )
+    registry.register(
+        Tool(
+            "show_figure",
+            "Show an image file from the workspace (a PNG/JPG/SVG plot) to the user inline in the chat. "
+            "You do not see the image yourself.",
+            _schema(
+                {
+                    "path": {"type": "string", "description": "Workspace-relative path, e.g. from list_figures."},
+                    "caption": {"type": "string", "description": "One line shown under the image."},
+                },
+                ["path"],
+            ),
+            show_figure,
+        )
+    )
+    registry.register(
+        Tool(
+            "plot_metrics",
+            "Draw logged metrics as line charts (one panel per metric, one line per run) and show the chart "
+            "to the user inline in the chat. Use it when the user asks to see, plot or compare curves.",
+            _schema(
+                {
+                    "run_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "1-6 run ids (or 'selected'/'latest'); default the selected run.",
+                    },
+                    "metrics": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Metric names or substrings (e.g. 'loss', 'reward'); default the first six.",
+                    },
+                    "title": {"type": "string"},
+                    "smooth": {"type": "integer", "description": "Moving-average window in points; 0 = raw."},
+                    "log_y": {"type": "boolean", "description": "Symmetric-log y axis for values spanning decades."},
+                }
+            ),
+            plot_metrics_tool,
         )
     )
     registry.register(
