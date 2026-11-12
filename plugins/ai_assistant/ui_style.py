@@ -138,6 +138,9 @@ QToolButton#sendButton[busy="true"] {{ background: {c["raised"]}; border: 1px so
 QFrame#keyBar {{ border: 1px solid {c["border"]}; border-left: 3px solid {c["accent"]}; border-radius: 8px;
     background: {c["surface"]}; }}
 QFrame#keyBar QLabel {{ background: transparent; }}
+QPushButton#signInButton {{ background: {c["primary"]}; color: {c["base"]}; border: none; border-radius: 6px;
+    padding: 7px 14px; font-weight: 600; }}
+QPushButton#signInButton:hover {{ background: {c["primary_hover"]}; }}
 QLabel#disclaimer {{ color: {c["muted"]}; font-size: 11px; }}
 QLabel#muted {{ color: {c["muted"]}; }}
 """

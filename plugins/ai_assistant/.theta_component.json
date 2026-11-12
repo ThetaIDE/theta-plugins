@@ -54,6 +54,7 @@
       "evals/scenarios.py",
       "hub.py",
       "keys.py",
+      "oauth.py",
       "panel.py",
       "pricing.py",
       "providers/__init__.py",

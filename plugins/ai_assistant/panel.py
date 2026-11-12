@@ -43,6 +43,7 @@ from .approval import ApprovalDialog
 from .bridge import WindowBridge
 from .chat_store import Chat, ChatStore
 from .keys import ENV_VARS, KeyStore, KeyStoreError, mask
+from .oauth import OAuthError, OpenRouterSignIn
 from .pricing import FREE_PROVIDERS, estimate, format_cost
 from .providers import (
     PROVIDERS,
@@ -218,6 +219,9 @@ RELAY_NOTE = """\
 """
 RELAY_PROVIDERS = frozenset({"openrouter"})
 
+# Providers whose key can come from signing in in the browser (OAuth with PKCE) instead of pasting it.
+SIGN_IN_FLOWS: dict[str, Callable[[], Any]] = {"openrouter": OpenRouterSignIn}
+
 KEY_URLS = {
     "openai": "https://platform.openai.com/api-keys",
     "anthropic": "https://console.anthropic.com/settings/keys",
@@ -367,6 +371,7 @@ class AlertRow(QFrame):
 class AssistantPanel(QWidget):
     _start_turn = pyqtSignal(object, str)
     _fetch_models = pyqtSignal(str, object)
+    _signed_in = pyqtSignal(str, object)  # provider id, key or OAuthError
     alerts_found = pyqtSignal(list)
 
     def __init__(self, context: Any, keys: KeyStore, parent: QWidget | None = None):
@@ -506,6 +511,17 @@ class AssistantPanel(QWidget):
         self.key_prompt.setWordWrap(True)
         self.key_prompt.setOpenExternalLinks(True)
         key_layout.addWidget(self.key_prompt)
+        self.sign_in_button = QPushButton()
+        self.sign_in_button.setObjectName("signInButton")
+        self.sign_in_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sign_in_button.clicked.connect(self.sign_in)
+        key_layout.addWidget(self.sign_in_button)
+        self.paste_label = QLabel("or paste a key:")
+        self.paste_label.setObjectName("muted")
+        key_layout.addWidget(self.paste_label)
+        self._sign_in: Any = None  # the attempt in progress
+        self._sign_in_cancel = threading.Event()
+        self._signed_in.connect(self._on_signed_in)
         entry = QHBoxLayout()
         self.key_input = QLineEdit()
         self.key_input.setEchoMode(QLineEdit.EchoMode.Password)
@@ -679,9 +695,19 @@ class AssistantPanel(QWidget):
             return
         name = cls.display_name
         link = KEY_URLS.get(pid)
+        can_sign_in = pid in SIGN_IN_FLOWS
+        self.sign_in_button.setVisible(can_sign_in)
+        self.paste_label.setVisible(can_sign_in)
+        self._update_sign_in_button()
         if cls.requires_key:
             get = f' <a href="{link}">Get a key ↗</a>' if link else ""
-            self.key_prompt.setText(f"<b>Add your {html.escape(name)} API key</b> to start chatting.{get}")
+            if can_sign_in:
+                self.key_prompt.setText(f"<b>Connect your {html.escape(name)} account</b> to start chatting.")
+                get_one = f' (<a href="{link}">get one ↗</a>)' if link else ""
+                self.paste_label.setText(f"or paste an API key{get_one}:")
+                self.paste_label.setOpenExternalLinks(True)
+            else:
+                self.key_prompt.setText(f"<b>Add your {html.escape(name)} API key</b> to start chatting.{get}")
             self.key_input.setPlaceholderText(f"Paste your {name} API key")
         else:
             self.key_prompt.setText(f"<b>Token for your {html.escape(name)} server</b> (only if it requires one).")
@@ -718,21 +744,90 @@ class AssistantPanel(QWidget):
         if not key and PROVIDERS[pid].requires_key:
             self.key_input.setFocus()
             return
+        if not key:
+            self.keys.delete(pid)
+            self._key_stored()
+            return
+        if self._store_key(pid, key):
+            self._key_stored()
+
+    def _store_key(self, pid: str, key: str, how: str = "") -> bool:
+        """Keychain first; with no keychain, offer this session only. False if the user declined."""
+        name = PROVIDERS[pid].display_name
         try:
-            if key:
-                self.keys.set(pid, key)
-                self.status.setText(f"{PROVIDERS[pid].display_name} key saved in the system keychain.")
-            else:
-                self.keys.delete(pid)
+            self.keys.set(pid, key)
+            self.status.setText(f"{how}{name} key saved in the system keychain.")
         except KeyStoreError as exc:
             if not self._use_key_for_session(str(exc)):
-                return
+                return False
             self.keys.set_session(pid, key)
-            self.status.setText("Using this key until ThetaIDE closes. It was not saved.")
+            self.status.setText(f"{how}Using this key until ThetaIDE closes. It was not saved.")
+        return True
+
+    def _key_stored(self) -> None:
         self.key_input.clear()
         self._editing_key = False
         self.agent = None
         self._update_key_status()
+
+    # ── Sign in with the browser (OAuth) ────────────────────────────────────
+
+    def _update_sign_in_button(self) -> None:
+        name = PROVIDERS[self.provider_id].display_name
+        waiting = self._sign_in is not None
+        self.sign_in_button.setText("Cancel sign-in" if waiting else f"Sign in with {name}")
+        self.sign_in_button.setToolTip(
+            "Stop waiting for the browser"
+            if waiting
+            else f"Opens {name} in your browser. Approve ThetaIDE there and the key is saved here."
+        )
+
+    def sign_in(self) -> None:
+        """Open the provider's sign-in page; when the user approves, the new key is saved like a pasted one."""
+        if self._sign_in is not None:  # the button reads "Cancel sign-in"
+            self._sign_in_cancel.set()
+            return
+        pid = self.provider_id
+        flow_class = SIGN_IN_FLOWS.get(pid)
+        if flow_class is None:
+            return
+        flow = flow_class()
+        try:
+            url = flow.start()
+        except OSError as exc:
+            self.status.setText(f"Could not start sign-in: {exc}")
+            return
+        self._sign_in, self._sign_in_cancel = flow, threading.Event()
+        if not QDesktopServices.openUrl(QUrl(url)):
+            QApplication.clipboard().setText(url)
+            self.status.setText("Could not open a browser. The sign-in address is on the clipboard: paste it into one.")
+        else:
+            self.status.setText(f"Approve ThetaIDE in your browser to sign in to {PROVIDERS[pid].display_name}…")
+        self._update_sign_in_button()
+        cancel = self._sign_in_cancel
+        threading.Thread(target=self._wait_for_sign_in, args=(pid, flow, cancel), daemon=True).start()
+
+    def _wait_for_sign_in(self, pid: str, flow: Any, cancel: threading.Event) -> None:
+        """Background thread: wait for the browser's redirect, exchange the code, report back."""
+        try:
+            result: Any = flow.finish(cancel.is_set)
+        except OAuthError as exc:
+            result = exc
+        except Exception as exc:  # never leave the button stuck on "Cancel sign-in"
+            result = OAuthError(f"Sign-in failed: {exc}")
+        if not cancel.is_set() or not isinstance(result, str):
+            self._signed_in.emit(pid, result)
+        else:
+            self._signed_in.emit(pid, OAuthError("Sign-in was cancelled."))
+
+    def _on_signed_in(self, pid: str, result: Any) -> None:
+        self._sign_in = None
+        self._update_sign_in_button()
+        if isinstance(result, Exception):
+            self.status.setText(str(result))
+            return
+        if self._store_key(pid, result, how="Signed in. "):
+            self._key_stored()
 
     def _use_key_for_session(self, reason: str) -> bool:
         box = QMessageBox(self)
@@ -762,6 +857,8 @@ class AssistantPanel(QWidget):
         source = self.keys.source(pid)
         label = "Set token…" if not PROVIDERS[pid].requires_key else ("Change API key…" if source else "Add API key…")
         menu.addAction(label, self.edit_key)
+        if pid in SIGN_IN_FLOWS:
+            menu.addAction(f"Sign in with {PROVIDERS[pid].display_name}…", self.sign_in)
         if source in ("keychain", "session"):
             menu.addAction("Remove saved key" if source == "keychain" else "Forget this key", self._remove_key)
         server = menu.addAction("Custom server URL")
@@ -1289,6 +1386,7 @@ class AssistantPanel(QWidget):
         self._provider_changed()
 
     def shutdown(self) -> None:
+        self._sign_in_cancel.set()
         app = QApplication.instance()
         if app is not None:
             app.removeEventFilter(self._focus_releaser)

@@ -2889,7 +2889,7 @@ def test_api_key_is_entered_in_the_panel_and_hidden_once_saved(tmp_path):
         app.processEvents()
         assert panel.provider_id == "openrouter"
         assert panel.key_bar.isVisible() and not panel.key_cancel.isVisible()
-        assert "openrouter.ai/keys" in panel.key_prompt.text()
+        assert "openrouter.ai/keys" in panel.paste_label.text()  # pasting a key stays possible
         panel.key_input.setText("sk-or-abcdefgh1234")
         panel.key_input.returnPressed.emit()
         assert keychain.store == {("ThetaIDE", "openrouter-api-key"): "sk-or-abcdefgh1234"}
@@ -3148,3 +3148,152 @@ def test_methods_in_one_run_are_overlaid_on_one_panel_per_metric(tmp_path):
     assert reported["panels"] == {"train/reward": ["ppo:train/reward", "a2c:train/reward"]}
     assert reported["final_values"] == {"ppo:train/reward": {"r1": 4.0}, "a2c:train/reward": {"r1": 2.5}}
     assert result.figures[0][1] == "train/reward · r1"
+
+
+# ── Sign in with OpenRouter (OAuth + PKCE) ───────────────────────────────────
+
+
+def browser_redirect(url, **params):
+    """What the browser does after the user approves: GET the callback with these query parameters."""
+    import urllib.request
+    from urllib.parse import parse_qs, urlencode, urlparse
+
+    callback = parse_qs(urlparse(url).query)["callback_url"][0]
+    with urllib.request.urlopen(f"{callback}?{urlencode(params)}", timeout=5) as response:
+        return response.status, response.read().decode()
+
+
+def test_pkce_challenge_is_the_s256_of_the_verifier():
+    import base64
+    import hashlib
+    import re
+
+    from plugins.ai_assistant.oauth import pkce_pair
+
+    verifier, challenge = pkce_pair()
+    assert 43 <= len(verifier) <= 128 and re.fullmatch(r"[A-Za-z0-9_\-]+", verifier)
+    assert challenge == base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    assert pkce_pair()[0] != verifier
+
+
+def test_openrouter_sign_in_exchanges_the_code_for_a_key():
+    import threading
+    from urllib.parse import parse_qs, urlparse
+
+    from plugins.ai_assistant.oauth import EXCHANGE_URL, OpenRouterSignIn
+
+    posted = []
+    flow = OpenRouterSignIn(post=lambda url, body: posted.append((url, body)) or {"key": "sk-or-v1-new"}, timeout=10)
+    url = flow.start()
+    query = {k: v[0] for k, v in parse_qs(urlparse(url).query).items()}
+    assert url.startswith("https://openrouter.ai/auth?")
+    assert query["code_challenge_method"] == "S256" and query["key_label"] == "ThetaIDE"
+    assert re.fullmatch(r"http://localhost:\d+/callback", query["callback_url"])
+    page = {}
+    browser = threading.Thread(
+        target=lambda: page.update(r=browser_redirect(url, code="auth-code-1", state=query["state"]))
+    )
+    browser.start()
+    assert flow.finish() == "sk-or-v1-new"
+    browser.join(5)
+    assert page["r"][0] == 200 and "Signed in to OpenRouter" in page["r"][1]
+    [(exchange_url, body)] = posted
+    assert exchange_url == EXCHANGE_URL
+    assert body["code"] == "auth-code-1" and body["code_challenge_method"] == "S256"
+    assert body["code_verifier"] == flow._verifier and body["code_verifier"] not in url  # only the challenge left
+
+
+@pytest.mark.parametrize(
+    "params, message",
+    [
+        ({"code": "c", "state": "forged"}, "did not match"),
+        ({"error": "access_denied"}, "declined"),
+    ],
+)
+def test_openrouter_sign_in_refuses_a_forged_or_declined_redirect(params, message):
+    import threading
+
+    from plugins.ai_assistant.oauth import OAuthError, OpenRouterSignIn
+
+    flow = OpenRouterSignIn(post=lambda *a: pytest.fail("exchanged a code it should have refused"), timeout=10)
+    url = flow.start()
+    threading.Thread(target=lambda: browser_redirect(url, **params)).start()
+    with pytest.raises(OAuthError, match=message):
+        flow.finish()
+
+
+def test_openrouter_sign_in_can_be_cancelled_and_frees_its_port():
+    import socket
+    import threading
+    import time
+
+    from plugins.ai_assistant.oauth import OAuthError, OpenRouterSignIn
+
+    flow = OpenRouterSignIn(post=lambda *a: {"key": "x"}, timeout=30)
+    flow.start()
+    port = flow._receiver.port
+    cancel = threading.Event()
+    threading.Timer(0.2, cancel.set).start()
+    started = time.monotonic()
+    with pytest.raises(OAuthError, match="cancelled"):
+        flow.finish(cancel.is_set)
+    assert time.monotonic() - started < 3
+    with socket.socket() as probe:  # the loopback listener is gone
+        assert probe.connect_ex(("127.0.0.1", port)) != 0
+
+
+def test_a_rejected_code_is_explained(monkeypatch):
+    import io
+    import urllib.error
+
+    from plugins.ai_assistant import oauth
+
+    def refuse(request, timeout):
+        raise urllib.error.HTTPError(request.full_url, 403, "Forbidden", {}, io.BytesIO(b"{}"))
+
+    monkeypatch.setattr(oauth.urllib.request, "urlopen", refuse)
+    with pytest.raises(oauth.OAuthError, match="may have expired"):
+        oauth.post_json(oauth.EXCHANGE_URL, {"code": "c"})
+
+
+def test_signing_in_from_the_panel_saves_the_key_in_the_keychain(tmp_path, monkeypatch):
+    import time
+
+    from PyQt6.QtCore import QCoreApplication
+    from PyQt6.QtGui import QDesktopServices
+    from PyQt6.QtWidgets import QApplication
+
+    from plugins.ai_assistant import panel as panel_module
+
+    app = QApplication.instance() or QApplication([])
+    opened = []
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toString()) or True)
+
+    class FakeFlow:
+        def start(self):
+            return "https://openrouter.ai/auth?code_challenge=abc"
+
+        def finish(self, cancelled):
+            return "sk-or-v1-from-oauth"
+
+    monkeypatch.setitem(panel_module.SIGN_IN_FLOWS, "openrouter", FakeFlow)
+    keychain = FakeKeychain()
+    panel = make_panel(tmp_path, KeyStore(backend=keychain, env={}), {"provider": "openrouter"})
+    try:
+        panel.show()
+        app.processEvents()
+        assert panel.sign_in_button.isVisible() and panel.sign_in_button.text() == "Sign in with OpenRouter"
+        panel.sign_in()
+        assert opened == ["https://openrouter.ai/auth?code_challenge=abc"]
+        for _ in range(200):
+            QCoreApplication.processEvents()
+            if panel._sign_in is None:
+                break
+            time.sleep(0.01)
+        assert keychain.store == {("ThetaIDE", "openrouter-api-key"): "sk-or-v1-from-oauth"}
+        assert not panel.key_bar.isVisible() and panel.status.text().startswith("Signed in.")
+
+        panel.provider_box.setCurrentIndex(panel.provider_box.findData("openai"))
+        assert panel.key_bar.isVisible() and not panel.sign_in_button.isVisible()  # OpenAI has no sign-in
+    finally:
+        close_panel(panel)
