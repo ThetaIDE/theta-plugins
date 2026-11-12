@@ -67,10 +67,17 @@
       "providers/transport.py",
       "settings_widget.py",
       "tools.py",
+      "ui_style.py",
       "watch.py"
     ],
     "resources": [
-      "ai_assistant.svg"
+      "ai_assistant.svg",
+      "icons/chats.svg",
+      "icons/more.svg",
+      "icons/new_chat.svg",
+      "icons/refresh.svg",
+      "icons/send.svg",
+      "icons/stop.svg"
     ],
     "configs": {}
   },

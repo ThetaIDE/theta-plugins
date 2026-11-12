@@ -3057,3 +3057,64 @@ def test_starting_the_panel_does_not_open_the_keychain(tmp_path):
         assert keychain.reads == ["openrouter-api-key"] and "1234" in panel._key_description()
     finally:
         close_panel(panel)
+
+
+def test_clicking_outside_the_message_box_takes_the_cursor_out_of_it(tmp_path):
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtTest import QTest
+    from PyQt6.QtWidgets import QApplication, QLabel
+
+    app = QApplication.instance() or QApplication([])
+    panel = make_panel(tmp_path, KeyStore(backend=FakeKeychain(), env={"OPENAI_API_KEY": "sk-env-1234"}))
+    elsewhere = QLabel("another IDE panel")  # labels never take focus, so Qt alone would leave the cursor
+    try:
+        panel.resize(460, 760)
+        panel.show()
+        elsewhere.show()
+        app.processEvents()
+
+        def focus_input():
+            panel.activateWindow()
+            panel.input.setFocus()
+            app.processEvents()
+            assert panel.input.hasFocus()
+
+        focus_input()
+        QTest.mouseClick(panel.input.viewport(), Qt.MouseButton.LeftButton)
+        assert panel.input.hasFocus()  # clicking inside keeps it
+        QTest.mouseClick(panel.disclaimer, Qt.MouseButton.LeftButton)
+        assert not panel.input.hasFocus()  # a label in the panel
+
+        focus_input()
+        QTest.mouseClick(elsewhere, Qt.MouseButton.LeftButton)
+        assert not panel.input.hasFocus()  # anywhere else in the IDE
+
+        focus_input()
+        QTest.mouseClick(panel.send_button, Qt.MouseButton.LeftButton)
+        assert panel.input.hasFocus()  # Send keeps the cursor for the next message
+    finally:
+        elsewhere.deleteLater()
+        close_panel(panel)
+
+
+def test_panel_buttons_use_the_plugins_svg_icons_and_follow_the_theme(tmp_path):
+    from PyQt6.QtWidgets import QApplication
+
+    from plugins.ai_assistant import ui_style
+
+    app = QApplication.instance() or QApplication([])
+    panel = make_panel(tmp_path, KeyStore(backend=FakeKeychain(), env={}))
+    try:
+        buttons = [panel.history_toggle, panel.new_chat_button, panel.more_button, panel.send_button]
+        assert all(not b.icon().isNull() and not b.text() for b in buttons)
+        assert {b.property(ui_style.ICON_PROPERTY) for b in buttons[:3]} == {"chats", "new_chat", "more"}
+        for name in ("chats", "new_chat", "refresh", "more", "send", "stop"):
+            assert (ui_style.ICON_DIR / f"{name}.svg").is_file()
+        assert panel.send_button.toolTip().startswith("Send")
+        panel._set_send_mode(busy=True)
+        assert panel.send_button.toolTip() == "Stop the reply" and panel.send_button.property("busy") == "true"
+        panel._set_send_mode(busy=False)
+        colors = ui_style.theme_colors()
+        assert colors["primary"] in panel.styleSheet()  # restyled from the theme's roles
+    finally:
+        close_panel(panel)

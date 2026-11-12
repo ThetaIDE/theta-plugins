@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from PyQt6.QtCore import QObject, Qt, QThread, QTimer, QUrl, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import QEvent, QObject, QSize, Qt, QThread, QTimer, QUrl, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QDesktopServices, QImage, QKeySequence, QShortcut, QTextDocument
 from PyQt6.QtWidgets import (
     QApplication,
@@ -54,6 +54,7 @@ from .providers import (
     create_provider,
 )
 from .tools import ToolRegistry, ToolResult, build_ide_tools
+from .ui_style import header_button, recolour_icons, stylesheet, svg_icon, theme_colors
 from .watch import INTERVAL_MS, Alert, RunWatcher
 
 QUICK_PROMPTS = (
@@ -100,6 +101,27 @@ def figure_markdown(index: int, entry: dict) -> str:
         return f"> 🖼 *{caption}* (the image file no longer exists)"
     url = bytes(QUrl.fromLocalFile(path).toEncoded()).decode()
     return f"[![{caption}](figure:{index})]({url})\n\n*{caption}* · [open]({url})"
+
+
+class FocusReleaser(QObject):
+    """Clicking anywhere outside the message box takes the text cursor out of it.
+
+    Qt moves focus only to widgets that accept it, so clicking a label, a chip, the empty panel or most of
+    the IDE left the cursor blinking in the box. This application-wide filter clears it on any press
+    outside the box, except on the widgets in `keep` (the Send button)."""
+
+    def __init__(self, editor: QWidget, keep: tuple[QWidget, ...] = ()):
+        super().__init__(editor)
+        self.editor = editor
+        self.keep = keep
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802  (Qt override)
+        if event.type() == QEvent.Type.MouseButtonPress and isinstance(watched, QWidget) and self.editor.hasFocus():
+            inside = watched is self.editor or self.editor.isAncestorOf(watched)
+            kept = any(watched is w or w.isAncestorOf(watched) for w in self.keep)
+            if not inside and not kept:
+                self.editor.clearFocus()
+        return False
 
 
 class Transcript(QTextBrowser):
@@ -202,31 +224,6 @@ KEY_URLS = {
     "gemini": "https://aistudio.google.com/apikey",
     "openrouter": "https://openrouter.ai/keys",
 }
-
-# palette() colours follow the IDE's light or dark theme.
-PANEL_STYLE = """
-QLabel#paneTitle { font-weight: 600; padding-left: 4px; }
-QListWidget#chatList { border: none; background: transparent; outline: none; }
-QListWidget#chatList::item { padding: 6px 6px; border-radius: 6px; margin: 1px 0; }
-QListWidget#chatList::item:selected { background: palette(highlight); color: palette(highlighted-text); }
-QListWidget#chatList::item:hover:!selected { background: palette(alternate-base); }
-QToolButton#chip { border: 1px solid palette(mid); border-radius: 11px; padding: 2px 10px; }
-QToolButton#chip:hover { background: palette(alternate-base); }
-QFrame#composer { border: 1px solid palette(mid); border-radius: 8px; background: palette(base); }
-QPlainTextEdit#composerInput { border: none; background: transparent; }
-QFrame#keyBar { border: 1px solid palette(highlight); border-radius: 8px; }
-QLabel#disclaimer { color: palette(placeholder-text); font-size: 11px; }
-"""
-
-
-def _tool_button(text: str, tip: str) -> QToolButton:
-    button = QToolButton()
-    button.setText(text)
-    button.setToolTip(tip)
-    button.setAutoRaise(True)
-    button.setFixedSize(28, 28)
-    return button
-
 
 WELCOME = """<div style="margin-top: 28px">
 <p align="center" style="font-size: 15px"><b>Ask about your runs</b></p>
@@ -429,7 +426,6 @@ class AssistantPanel(QWidget):
     # ── UI ──────────────────────────────────────────────────────────────────
 
     def _build_ui(self) -> None:
-        self.setStyleSheet(PANEL_STYLE)
         outer = QHBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -465,7 +461,7 @@ class AssistantPanel(QWidget):
 
         row = QHBoxLayout()
         row.setSpacing(4)
-        self.history_toggle = _tool_button("☰", "Show or hide your saved chats")
+        self.history_toggle = header_button("chats", "Show or hide your saved chats")
         self.history_toggle.setCheckable(True)
         self.history_toggle.toggled.connect(self._set_history_visible)
         self.provider_box = QComboBox()
@@ -477,11 +473,11 @@ class AssistantPanel(QWidget):
         self.model_box.setMinimumWidth(120)
         self.model_box.setToolTip("Model id. Type any id the provider accepts, or press ↻ to list them.")
         self.model_box.currentTextChanged.connect(self._model_changed)
-        refresh = _tool_button("↻", "List the models available to this key")
+        refresh = header_button("refresh", "List the models available to this key")
         refresh.clicked.connect(self._refresh_models)
-        self.new_chat_button = _tool_button("＋", "New chat")
+        self.new_chat_button = header_button("new_chat", "New chat")
         self.new_chat_button.clicked.connect(self.new_chat)
-        self.more_button = _tool_button("⋯", "API key, server and chat options")
+        self.more_button = header_button("more", "API key, server and chat options")
         self.more_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.more_menu = QMenu(self.more_button)
         self.more_menu.aboutToShow.connect(self._fill_more_menu)
@@ -557,21 +553,21 @@ class AssistantPanel(QWidget):
         chips.addStretch(1)
         layout.addLayout(chips)
 
-        composer = QFrame()
-        composer.setObjectName("composer")
-        composer_layout = QHBoxLayout(composer)
-        composer_layout.setContentsMargins(6, 4, 4, 4)
-        composer_layout.setSpacing(4)
+        composer = QHBoxLayout()
+        composer.setSpacing(8)
         self.input = QPlainTextEdit()
         self.input.setObjectName("composerInput")
         self.input.setPlaceholderText("Message the assistant (Ctrl+Enter to send)")
-        self.input.setFixedHeight(64)
-        self.send_button = QPushButton("Send")
-        self.send_button.setDefault(True)
+        self.input.setFixedHeight(68)
+        self.send_button = QToolButton()  # beside the message box, not inside it
+        self.send_button.setObjectName("sendButton")
+        self.send_button.setFixedSize(36, 36)
+        self.send_button.setIconSize(QSize(24, 24))
+        self.send_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.send_button.clicked.connect(self._send_clicked)
-        composer_layout.addWidget(self.input, 1)
-        composer_layout.addWidget(self.send_button, 0, Qt.AlignmentFlag.AlignBottom)
-        layout.addWidget(composer)
+        composer.addWidget(self.input, 1)
+        composer.addWidget(self.send_button, 0, Qt.AlignmentFlag.AlignBottom)
+        layout.addLayout(composer)
         for keys in ("Ctrl+Return", "Ctrl+Enter"):
             QShortcut(QKeySequence(keys), self.input, activated=self._send_clicked)
 
@@ -586,10 +582,40 @@ class AssistantPanel(QWidget):
         self.disclaimer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.disclaimer)
 
+        self._set_send_mode(busy=False)
+        self.apply_theme()
+        theme_manager = getattr(getattr(self.context, "window", None), "theme_manager", None)
+        changed = getattr(theme_manager, "changed", None)
+        if changed is not None:
+            changed.connect(self.apply_theme)
+        self._focus_releaser = FocusReleaser(self.input, keep=(self.send_button,))
+        QApplication.instance().installEventFilter(self._focus_releaser)
+
         visible = bool(self._setting("history_open", False))
         self.history_toggle.setChecked(visible)
         self._set_history_visible(visible)
         self._refresh_history_list()
+
+    def apply_theme(self) -> None:
+        """Restyle and recolour the icons in the IDE's current theme (called again when it changes)."""
+        self._colors = theme_colors()
+        self.setStyleSheet(stylesheet(self._colors))
+        recolour_icons(self, self._colors)
+        self._set_send_mode(self.busy)
+        self._render(follow=False)
+
+    def _set_send_mode(self, busy: bool) -> None:
+        colors = getattr(self, "_colors", None) or theme_colors()
+        if busy:
+            self.send_button.setIcon(svg_icon("stop", colors["text"], size=24))
+            self.send_button.setToolTip("Stop the reply")
+        else:
+            self.send_button.setIcon(svg_icon("send", colors["base"], disabled=colors["disabled"], size=24))
+            self.send_button.setToolTip("Send (Ctrl+Enter)")
+        self.send_button.setAccessibleName(self.send_button.toolTip())
+        self.send_button.setProperty("busy", "true" if busy else "false")
+        self.send_button.style().unpolish(self.send_button)
+        self.send_button.style().polish(self.send_button)
 
     # ── Provider selection & settings ───────────────────────────────────────
 
@@ -615,6 +641,7 @@ class AssistantPanel(QWidget):
         self.model_box.clear()
         self.model_box.addItems(known)
         self.model_box.setCurrentText(models.get(pid) or cls.default_model)
+        self.model_box.lineEdit().setCursorPosition(0)  # show the start of a long "vendor/model" id
         self.model_box.blockSignals(False)
         urls = self._setting("base_urls", {}) or {}
         self.base_url.setText(urls.get(pid, ""))
@@ -903,7 +930,7 @@ class AssistantPanel(QWidget):
             self._append("error", str(exc))
             return
         self.busy = True
-        self.send_button.setText("Stop")
+        self._set_send_mode(busy=True)
         self.status.setText(f"{PROVIDERS[self.provider_id].display_name} · {agent.provider.config.model} · thinking…")
         if not self.chat.title:
             self.chat.title = Chat.title_for(text)
@@ -1124,7 +1151,7 @@ class AssistantPanel(QWidget):
 
     def _done(self, status: str) -> None:
         self.busy = False
-        self.send_button.setText("Send")
+        self._set_send_mode(busy=False)
         self.status.setText(status)
         while self.entries and self.entries[-1]["kind"] == "assistant" and not self.entries[-1]["text"].strip():
             self.entries.pop()
@@ -1262,6 +1289,9 @@ class AssistantPanel(QWidget):
         self._provider_changed()
 
     def shutdown(self) -> None:
+        app = QApplication.instance()
+        if app is not None:
+            app.removeEventFilter(self._focus_releaser)
         self.watch_timer.stop()
         self.worker.cancel.set()
         self.invoker.closing = True
