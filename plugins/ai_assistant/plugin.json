@@ -1,0 +1,13 @@
+{
+  "id": "ai_assistant",
+  "name": "AI Assistant",
+  "version": "1.0.0",
+  "description": "Chat with OpenAI, Anthropic, Gemini or a local Ollama model about your runs. It reads configs, logs and metrics to explain failures, compare runs and suggest hyperparameters, watches training runs for NaN, divergence and stalls, and can edit configs, install Hub components and launch or stop runs with your approval.",
+  "author": "ThetaIDE Team",
+  "default_enabled": true,
+  "icon": "ai_assistant",
+  "entry_point": "AIAssistantPlugin",
+  "extra": {
+    "has_settings": true
+  }
+}
