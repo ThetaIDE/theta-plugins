@@ -107,6 +107,7 @@ class KeyStore:
         self._waker = waker if waker is not None else (wake_secret_service if wakes else lambda: False)
         self._woken = False
         self._cache: dict[str, str] = {}  # keychain values already read this session
+        self._looked: set[str] = set()  # providers whose keychain entry was read this session, found or not
         self._load_index: Callable[[], Any] | None = None
         self._save_index: Callable[[list[str]], None] | None = None
 
@@ -124,14 +125,12 @@ class KeyStore:
     def _record(self, provider: str, present: bool) -> None:
         if self._save_index is None:
             return
-        index = self._index()
-        if index is None and not present:
-            return  # an unknown index stays unknown until a key is found or saved
-        index = set(index or ())
+        known = self._index()
+        index = set(known or ())
         if (provider in index) != present:
             index.symmetric_difference_update({provider})
             self._save_index(sorted(index))
-        elif self._index() is None:
+        elif known is None:  # the index now exists, so later lookups need not open the keychain
             self._save_index(sorted(index))
 
     @property
@@ -178,15 +177,18 @@ class KeyStore:
         """Read the keychain (this may show its unlock prompt). Cached for the session."""
         if provider in self._cache:
             return self._cache[provider]
+        self._looked.add(provider)
         if self.backend is None:
             return None
         try:
             value = self.backend.get_password(SERVICE, self.username(provider)) or None
-        except Exception:  # a locked or unreachable keychain must not crash the IDE
+        except Exception:  # a locked, refused or unreachable keychain must not crash the IDE
             return None
         if value:
             self._cache[provider] = value
-        self._record(provider, bool(value))
+            self._record(provider, True)
+        elif self.is_secure():  # the keychain answered "no such key": remember it, so it is not asked again
+            self._record(provider, False)
         return value
 
     def _in_keychain(self, provider: str) -> bool:
@@ -201,15 +203,22 @@ class KeyStore:
         return bool(self._keychain_value(provider))
 
     def get(self, provider: str) -> str | None:
-        """The key to use. Reads the keychain if it may hold one, which can prompt to unlock it."""
+        """The key to use: this session's, the keychain's, then the environment variable's.
+
+        The keychain is opened (which can prompt to unlock it, or with KWallet to create a wallet) only when
+        it is known to hold this provider's key, or, with nothing else to go on, once per session to find
+        out. A key in the environment is used without opening the keychain at all."""
         if self._session.get(provider):
             return self._session[provider]
         index = self._index()
-        if index is None or provider in index or provider in self._cache:
-            value = self._keychain_value(provider)
+        if provider in self._cache or (index is not None and provider in index and provider not in self._looked):
+            value = self._keychain_value(provider)  # a refused or cancelled unlock is not asked again
             if value:
                 return value
-        return self._env.get(ENV_VARS.get(provider, ""), "") or None
+        env = self._env.get(ENV_VARS.get(provider, ""), "") or None
+        if env or index is not None or provider in self._looked:
+            return env
+        return self._keychain_value(provider)
 
     def peek(self, provider: str) -> str | None:
         """The key if it is known without opening the keychain (for showing its last four characters)."""

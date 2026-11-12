@@ -3009,6 +3009,48 @@ def indexed_keys(keychain, settings, env=None):
     return keys
 
 
+def test_sending_with_an_environment_key_never_opens_the_keychain():
+    # KWallet with no wallet yet asks to create one on every read; an environment key must not trigger that.
+    keychain, settings = CountingKeychain(), {}
+    env = {"OPENROUTER_API_KEY": "sk-or-env-9999"}
+    keys = indexed_keys(keychain, settings, env=env)
+    for _ in range(3):  # three messages sent
+        assert keys.get("openrouter") == "sk-or-env-9999"
+    assert keychain.reads == [] and keys.source("openrouter") == "environment"
+    keys.set("openrouter", "sk-or-saved-1234")  # a saved key still beats the environment
+    assert indexed_keys(keychain, settings, env=env).get("openrouter") == "sk-or-saved-1234"
+
+
+def test_with_no_index_the_keychain_is_asked_once_and_the_answer_remembered():
+    keychain, settings = CountingKeychain(), {}
+    keys = indexed_keys(keychain, settings)
+    assert keys.get("openai") is None and keys.get("openai") is None
+    assert keychain.reads == ["openai-api-key"]  # once, not on every send
+    assert settings == {"keychain_keys": []}  # "no keys" is known now
+    assert indexed_keys(keychain, settings).get("openai") is None  # next start: no read at all
+    assert keychain.reads == ["openai-api-key"]
+
+
+class RefusingKeychain(CountingKeychain):
+    """A keychain whose unlock (or wallet creation) the user cancels."""
+
+    def get_password(self, service, user):
+        super().get_password(service, user)
+        raise RuntimeError("the user cancelled")
+
+
+def test_a_cancelled_keychain_prompt_is_not_shown_again_this_session():
+    keychain, settings = RefusingKeychain(), {}
+    keys = indexed_keys(keychain, settings)
+    assert keys.get("openai") is None and keys.get("openai") is None
+    assert len(keychain.reads) == 1 and "keychain_keys" not in settings  # unknown, so ask again next start
+
+    settings["keychain_keys"] = ["openai"]  # a saved key whose unlock is cancelled
+    keys = indexed_keys(keychain, settings, env={"OPENAI_API_KEY": "sk-env-0000"})
+    assert keys.get("openai") == "sk-env-0000" and keys.get("openai") == "sk-env-0000"
+    assert len(keychain.reads) == 2
+
+
 def test_the_keychain_index_holds_provider_names_never_keys():
     keychain, settings = CountingKeychain(), {}
     keys = indexed_keys(keychain, settings, env={"OPENAI_API_KEY": "sk-env-0000"})
@@ -3118,6 +3160,82 @@ def test_panel_buttons_use_the_plugins_svg_icons_and_follow_the_theme(tmp_path):
         assert colors["primary"] in panel.styleSheet()  # restyled from the theme's roles
     finally:
         close_panel(panel)
+
+
+def test_streaming_redraws_only_the_reply_being_written(tmp_path):
+    from PyQt6.QtWidgets import QApplication
+
+    from plugins.ai_assistant.keys import KeyStore
+
+    app = QApplication.instance() or QApplication([])
+    panel = make_panel(tmp_path, KeyStore(backend=FakeKeychain(), env={}))
+    try:
+        panel.resize(420, 300)
+        panel.show()
+        app.processEvents()
+        panel.entries = [{"kind": "user", "text": f"question {i}\n\n" + "filler line\n\n" * 8} for i in range(6)]
+        panel.entries.append({"kind": "assistant", "text": ""})
+        panel._render()
+        full_renders = []
+        original = panel.transcript.setMarkdown
+        panel.transcript.setMarkdown = lambda text: (full_renders.append(text), original(text))[1]
+        bar = panel.transcript.verticalScrollBar()
+        assert bar.maximum() > 0  # long enough to scroll
+        bar.setValue(bar.maximum())
+        reply = ["# Plan\n\n", "First, ", "**check** the run.\n\n", "```py\nx = 1\n```\n\n", "- a\n- b"]
+        for piece in reply:
+            panel._on_delta(piece)
+            panel._render(tail_only=True)
+            assert bar.value() == bar.maximum()  # follows the reply without jumping
+        assert full_renders == []  # the earlier messages were never rebuilt
+        streamed = panel.transcript.document().toMarkdown()
+        panel.transcript.setMarkdown = original
+        panel._render()  # a full rebuild lays it out the same way
+        assert panel.transcript.document().toMarkdown() == streamed
+        assert "# Plan" in streamed and "```py" in streamed
+
+        bar.setValue(0)  # scrolled up to read: streaming leaves the view alone
+        panel._on_delta(" more")
+        panel._render(tail_only=True)
+        assert bar.value() == 0
+        panel.entries.append({"kind": "notice", "text": "new entry"})  # anything else rebuilds
+        panel._render(tail_only=True)
+        assert "new entry" in panel.transcript.toPlainText() and " more" in panel.transcript.toPlainText()
+    finally:
+        close_panel(panel)
+    app.processEvents()
+
+
+def test_cross_spinner_steps_only_while_the_assistant_works(tmp_path):
+    from PyQt6.QtGui import QPixmap
+    from PyQt6.QtWidgets import QApplication
+
+    from plugins.ai_assistant import ui_style
+    from plugins.ai_assistant.keys import KeyStore
+
+    app = QApplication.instance() or QApplication([])
+    panel = make_panel(tmp_path, KeyStore(backend=FakeKeychain(), env={}))
+    try:
+        spinner = panel.spinner
+        assert (ui_style.ICON_DIR / "cross.svg").is_file()
+        assert spinner.isHidden() and not spinner.is_spinning()
+        panel.busy = True  # as ask() does
+        panel._set_send_mode(busy=True)
+        assert not spinner.isHidden() and spinner.is_spinning()
+        spinner._advance()
+        assert spinner._angle == 45.0  # + became x, in one step
+        spinner._advance()
+        assert spinner._angle == 90.0  # and back to +
+        panel.apply_theme()  # a theme change while busy keeps it spinning, in the new accent colour
+        assert spinner.is_spinning() and spinner._color == ui_style.theme_colors()["accent"]
+        picture = QPixmap(spinner.size())
+        picture.fill()
+        spinner.render(picture)  # paints without error
+        panel._done("")
+        assert spinner.isHidden() and not spinner.is_spinning()
+    finally:
+        close_panel(panel)
+    app.processEvents()
 
 
 def test_methods_in_one_run_are_overlaid_on_one_panel_per_metric(tmp_path):

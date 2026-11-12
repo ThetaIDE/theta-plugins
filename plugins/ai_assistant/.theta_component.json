@@ -74,6 +74,7 @@
     "resources": [
       "ai_assistant.svg",
       "icons/chats.svg",
+      "icons/cross.svg",
       "icons/more.svg",
       "icons/new_chat.svg",
       "icons/refresh.svg",

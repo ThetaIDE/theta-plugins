@@ -10,7 +10,7 @@ from __future__ import annotations
 import functools
 from pathlib import Path
 
-from PyQt6.QtCore import QByteArray, QRectF, QSize, Qt
+from PyQt6.QtCore import QByteArray, QRectF, QSize, Qt, QTimer
 from PyQt6.QtGui import QIcon, QPainter, QPalette, QPixmap
 from PyQt6.QtWidgets import QApplication, QToolButton, QWidget
 
@@ -107,6 +107,65 @@ def recolour_icons(root: QWidget, colors: dict[str, str]) -> None:
         name = button.property(ICON_PROPERTY)
         if name:
             button.setIcon(svg_icon(name, colors["text"], colors["accent"], colors["disabled"]))
+
+
+@functools.lru_cache(maxsize=16)
+def _renderer(name: str, color: str):
+    from PyQt6.QtSvg import QSvgRenderer
+
+    source = (ICON_DIR / f"{name}.svg").read_text(encoding="utf-8").replace("currentColor", color)
+    return QSvgRenderer(QByteArray(source.encode("utf-8")))
+
+
+class CrossSpinner(QWidget):
+    """A cross that steps clockwise by 45 degrees while the assistant works: +, then x, then + again.
+
+    It jumps from one position to the next and holds there, with no turning in between. The timer runs only
+    while the spinner is shown."""
+
+    STEP_DEGREES = 45.0
+    STEP_MS = 260  # how long each + or x stays before the next step
+
+    def __init__(self, size: int = 16, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._size = size
+        self._angle = 0.0
+        self._color = "#888888"
+        self.setFixedSize(size, size)
+        self.setAccessibleName("Working")
+        self._timer = QTimer(self)
+        self._timer.setInterval(self.STEP_MS)
+        self._timer.timeout.connect(self._advance)
+        self.hide()
+
+    def set_color(self, color: str) -> None:
+        self._color = color
+        self.update()
+
+    def is_spinning(self) -> bool:
+        return self._timer.isActive()
+
+    def start(self) -> None:
+        self._angle = 0.0
+        self.show()
+        self._timer.start()
+
+    def stop(self) -> None:
+        self._timer.stop()
+        self.hide()
+
+    def _advance(self) -> None:
+        self._angle = (self._angle + self.STEP_DEGREES) % 360.0
+        self.update()
+
+    def paintEvent(self, _event) -> None:  # noqa: N802  (Qt API)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.translate(self.width() / 2, self.height() / 2)
+        painter.rotate(self._angle)  # positive is clockwise on screen
+        half = self._size / 2
+        _renderer("cross", self._color).render(painter, QRectF(-half, -half, self._size, self._size))
+        painter.end()
 
 
 def stylesheet(c: dict[str, str]) -> str:

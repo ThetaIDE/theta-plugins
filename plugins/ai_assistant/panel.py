@@ -17,7 +17,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from PyQt6.QtCore import QEvent, QObject, QSize, Qt, QThread, QTimer, QUrl, pyqtSignal, pyqtSlot
-from PyQt6.QtGui import QDesktopServices, QImage, QKeySequence, QShortcut, QTextDocument
+from PyQt6.QtGui import QDesktopServices, QImage, QKeySequence, QShortcut, QTextCursor, QTextDocument
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -55,7 +55,7 @@ from .providers import (
     create_provider,
 )
 from .tools import ToolRegistry, ToolResult, build_ide_tools
-from .ui_style import header_button, recolour_icons, stylesheet, svg_icon, theme_colors
+from .ui_style import CrossSpinner, header_button, recolour_icons, stylesheet, svg_icon, theme_colors
 from .watch import INTERVAL_MS, Alert, RunWatcher
 
 QUICK_PROMPTS = (
@@ -411,7 +411,9 @@ class AssistantPanel(QWidget):
         self._render_timer = QTimer(self)
         self._render_timer.setSingleShot(True)
         self._render_timer.setInterval(50)
-        self._render_timer.timeout.connect(self._render)
+        self._render_timer.timeout.connect(lambda: self._render(tail_only=True))
+        self._shown_prefix: str | None = None  # the transcript's markdown before the last entry
+        self._tail_start = 0  # where the last entry starts in the transcript's document
 
         self._build_ui()
         self._load_selection()
@@ -587,10 +589,15 @@ class AssistantPanel(QWidget):
         for keys in ("Ctrl+Return", "Ctrl+Enter"):
             QShortcut(QKeySequence(keys), self.input, activated=self._send_clicked)
 
+        status_row = QHBoxLayout()
+        status_row.setSpacing(6)
+        self.spinner = CrossSpinner(16)  # steps round while the assistant is thinking or running tools
         self.status = QLabel("")
         self.status.setObjectName("muted")
         self.status.setWordWrap(True)
-        layout.addWidget(self.status)
+        status_row.addWidget(self.spinner, 0, Qt.AlignmentFlag.AlignTop)
+        status_row.addWidget(self.status, 1)
+        layout.addLayout(status_row)
 
         self.disclaimer = QLabel(DISCLAIMER)
         self.disclaimer.setObjectName("disclaimer")
@@ -629,6 +636,11 @@ class AssistantPanel(QWidget):
             self.send_button.setIcon(svg_icon("send", colors["base"], disabled=colors["disabled"], size=24))
             self.send_button.setToolTip("Send (Ctrl+Enter)")
         self.send_button.setAccessibleName(self.send_button.toolTip())
+        self.spinner.set_color(colors["accent"])
+        if busy and not self.spinner.is_spinning():
+            self.spinner.start()
+        elif not busy:
+            self.spinner.stop()
         self.send_button.setProperty("busy", "true" if busy else "false")
         self.send_button.style().unpolish(self.send_button)
         self.send_button.style().polish(self.send_button)
@@ -1255,36 +1267,70 @@ class AssistantPanel(QWidget):
         self._render()
         self._save_chat()
 
-    def _render(self, follow: bool = True) -> None:
-        """Redraw the transcript. follow=False keeps the view where it is (expanding a tool line)."""
+    def _render(self, follow: bool = True, tail_only: bool = False) -> None:
+        """Redraw the transcript. follow=False keeps the view where it is (expanding a tool line).
+
+        tail_only (while a reply streams in) redraws just the last entry when nothing before it changed, so
+        the view neither re-lays out the whole chat nor jumps; anything else rebuilds the document."""
         bar = self.transcript.verticalScrollBar()
         position = bar.value()
         at_bottom = follow and position >= bar.maximum() - 4
-        parts = []
         self._snippets: list[str] = []
-        for index, entry in enumerate(self.entries):
-            kind, text = entry["kind"], entry["text"]
-            if kind == "user":
-                parts.append(("---\n\n" if parts else "") + "**You**\n\n" + text)
-            elif kind == "assistant":
-                parts.append(with_copy_links(text, self._snippets) if text else "…")
-            elif kind == "tool":
-                label = text.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
-                marker = "▾" if entry.get("open") else "▸"
-                parts.append(f"> [{marker} 🔧 {label}](tool:{index})")
-                if entry.get("open"):
-                    parts.append(tool_details(entry))
-            elif kind == "figure":
-                parts.append(figure_markdown(index, entry))
-            elif kind == "error":
-                parts.append("> ⚠ **Error:** " + text)
-            else:
-                parts.append("> " + text)
+        parts = [self._entry_markdown(index, entry) for index, entry in enumerate(self.entries)]
         if not parts:
+            self._shown_prefix = None
             self.transcript.setHtml(WELCOME)  # wraps to the panel's width, unlike a placeholder
             return
-        self.transcript.setMarkdown("\n\n".join(p for p in parts if p))
+        prefix = "\n\n".join(p for p in parts[:-1] if p)
+        if not prefix:  # a single entry: nothing to keep
+            self._shown_prefix = None
+            self.transcript.setMarkdown(parts[-1])
+        elif not (tail_only and prefix == self._shown_prefix):
+            self.transcript.setMarkdown(prefix)
+            self._shown_prefix = prefix
+            end = QTextCursor(self.transcript.document())
+            end.movePosition(QTextCursor.MoveOperation.End)
+            self._tail_start = end.position()
+        if prefix:
+            self._replace_tail(parts[-1])
         bar.setValue(bar.maximum() if at_bottom else position)
+
+    def _entry_markdown(self, index: int, entry: dict) -> str:
+        kind, text = entry["kind"], entry["text"]
+        if kind == "user":
+            return ("---\n\n" if index else "") + "**You**\n\n" + text
+        if kind == "assistant":
+            return with_copy_links(text, self._snippets) if text else "…"
+        if kind == "tool":
+            label = text.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+            marker = "▾" if entry.get("open") else "▸"
+            line = f"> [{marker} 🔧 {label}](tool:{index})"
+            return line + "\n\n" + tool_details(entry) if entry.get("open") else line
+        if kind == "figure":
+            return figure_markdown(index, entry)
+        if kind == "error":
+            return "> ⚠ **Error:** " + text
+        return "> " + text
+
+    def _replace_tail(self, markdown: str) -> None:
+        """Replace everything after _tail_start with the last entry, keeping its first block's format.
+
+        Inserting markdown into a new block would give its first block (a heading, a code block) that
+        block's plain format, so a throwaway paragraph goes first and is then removed with the block break
+        before it, leaving the entry's own blocks exactly as setMarkdown() would lay them out."""
+        cursor = QTextCursor(self.transcript.document())
+        cursor.setPosition(self._tail_start)
+        cursor.movePosition(QTextCursor.MoveOperation.End, QTextCursor.MoveMode.KeepAnchor)
+        cursor.removeSelectedText()
+        if not markdown:
+            return
+        cursor.beginEditBlock()
+        cursor.insertBlock()
+        cursor.insertMarkdown("\u200b\n\n" + markdown)
+        cursor.setPosition(self._tail_start)
+        cursor.setPosition(self._tail_start + 2, QTextCursor.MoveMode.KeepAnchor)
+        cursor.removeSelectedText()
+        cursor.endEditBlock()
 
     # ── Lifecycle ───────────────────────────────────────────────────────────
 
