@@ -298,6 +298,11 @@ STREAMS = {
     "anthropic": (anthropic_tool_call, anthropic_text),
     "gemini": (gemini_tool_call, gemini_text),
     "ollama": (ollama_tool_call, ollama_text),
+    # OpenRouter speaks OpenAI's protocol and sends ": OPENROUTER PROCESSING" keep-alive comments.
+    "openrouter": (
+        lambda: [": OPENROUTER PROCESSING", "", *openai_tool_call()],
+        lambda text="CUDA ran out of memory.": [": OPENROUTER PROCESSING", "", *openai_text(text)],
+    ),
 }
 
 
@@ -442,8 +447,8 @@ class FakeBridge:
 # ── Provider adapters ────────────────────────────────────────────────────────
 
 
-def test_all_four_providers_are_registered():
-    assert set(PROVIDERS) == {"openai", "anthropic", "gemini", "ollama"}
+def test_every_provider_is_registered():
+    assert set(PROVIDERS) == {"openai", "anthropic", "gemini", "ollama", "openrouter"}
 
 
 @pytest.mark.parametrize("pid", sorted(STREAMS))
@@ -603,7 +608,7 @@ def test_ollama_needs_no_key_and_uses_local_server():
     assert "authorization" not in transport.requests[0]["headers"]
 
 
-@pytest.mark.parametrize("pid", ["openai", "anthropic", "gemini"])
+@pytest.mark.parametrize("pid", ["openai", "anthropic", "gemini", "openrouter"])
 def test_missing_key_fails_before_any_request(pid):
     provider, transport = adapter(pid, api_key=None)
     with pytest.raises(AuthenticationError, match="no API key"):
@@ -1264,6 +1269,7 @@ def test_panel_streams_a_turn_on_a_worker_thread(monkeypatch, tmp_path):
     reopened = panel_module.AssistantPanel(context, keys)
     try:
         assert "You have no runs yet." in reopened.transcript.toPlainText()
+        assert reopened.disclaimer.text().startswith("AI can make mistakes")
         assert [m.role for m in reopened.history] == [
             "user",
             "assistant",
@@ -2518,3 +2524,112 @@ def test_eval_workspace_serves_every_file_it_advertises(scenario):
     for spelling in (f"in/config/{first}", first.removesuffix(".yaml"), f"./{first}"):
         assert bridge.read_text(spelling) == bridge.read_text(first)
     assert tools.execute(ToolCall("x", "read_file", {"path": "experiment/nope.yaml"})).is_error
+
+
+# ── OpenRouter ───────────────────────────────────────────────────────────────
+
+
+def test_openrouter_request_uses_its_endpoint_auth_and_generic_attribution():
+    provider, transport = adapter("openrouter", openai_text(), model="anthropic/claude-sonnet-4.5", max_tokens=900)
+    list(provider.stream([Message("user", "hi")], [ToolSpec("list_runs", "d", {"type": "object"})], system="rules"))
+    request = transport.requests[0]
+    assert request["url"] == "https://openrouter.ai/api/v1/chat/completions"
+    headers = request["headers"]
+    assert headers["authorization"] == "Bearer sk-test-1234"
+    assert headers["x-title"] == "ThetaIDE" and headers["http-referer"] == "https://github.com/ThetaIDE/ThetaIDE"
+    payload = request["payload"]
+    assert payload["model"] == "anthropic/claude-sonnet-4.5"
+    assert payload["max_tokens"] == 900 and "max_completion_tokens" not in payload
+    assert payload["usage"] == {"include": True}
+    assert payload["messages"][0] == {"role": "system", "content": "rules"}
+    assert payload["tools"][0]["function"]["name"] == "list_runs"
+
+
+def test_openrouter_reports_the_exact_cost_and_the_panel_prefers_it():
+    stream = [
+        ": OPENROUTER PROCESSING",
+        "",
+        *sse(
+            {"choices": [{"delta": {"content": "ok"}, "finish_reason": "stop"}]},
+            {"choices": [], "usage": {"prompt_tokens": 1200, "completion_tokens": 40, "cost": 0.00321}},
+            done=True,
+        ),
+    ]
+    provider, _ = adapter("openrouter", stream)
+    text, completion = collect(provider.stream([Message("user", "hi")], []))
+    assert text == "ok"
+    assert completion.usage == Usage(1200, 40, 0, cost=0.00321)
+    # Costs add up across the steps of a turn; a step without a reported cost does not erase the total.
+    assert (Usage() + completion.usage + completion.usage).cost == pytest.approx(0.00642)
+    assert (Usage(1, 1) + Usage(1, 1)).cost is None
+
+
+def test_openrouter_error_after_the_stream_opened_is_reported_as_openrouter():
+    stream = [
+        *sse({"choices": [{"delta": {"content": "par"}}]}),
+        *sse({"error": {"code": 502, "message": "Upstream provider returned an error"}}),
+    ]
+    provider, _ = adapter("openrouter", stream)
+    with pytest.raises(ProviderUnavailableError, match="OpenRouter: Upstream provider"):
+        list(provider.stream([Message("user", "hi")], []))
+
+
+def test_openrouter_lists_vendor_model_ids():
+    provider, transport = adapter(
+        "openrouter", {"data": [{"id": "openai/gpt-4o-mini"}, {"id": "anthropic/claude-sonnet-4.5"}]}
+    )
+    assert set(provider.list_models()) == {"openai/gpt-4o-mini", "anthropic/claude-sonnet-4.5"}
+    assert transport.requests[0]["url"] == "https://openrouter.ai/api/v1/models"
+
+
+def test_openrouter_key_comes_from_its_environment_variable():
+    keys = KeyStore(backend=FakeKeychain(), env={"OPENROUTER_API_KEY": "sk-or-env-9876"})
+    assert keys.get("openrouter") == "sk-or-env-9876" and keys.source("openrouter") == "environment"
+
+
+def test_vendor_prefixed_model_ids_fall_back_to_the_vendor_price():
+    assert price_for("openai/gpt-4.1-mini") == price_for("gpt-4.1-mini") is not None
+    assert price_for("someone/unknown-model") is None
+
+
+def test_openrouter_data_sharing_notice_says_it_forwards_requests(monkeypatch, tmp_path):
+    import os
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PyQt6.QtWidgets import QApplication, QMessageBox
+
+    from plugins.ai_assistant import panel as panel_module
+
+    app = QApplication.instance() or QApplication([])
+
+    class Context:
+        window = SimpleNamespace(runs=[], selected=None, active_runs=[], current_experiment=None)
+        settings: dict = {}
+
+        def get_workspace_dir(self):
+            return tmp_path
+
+        def get_data_dir(self):
+            return tmp_path / ".thetaide"
+
+        def get_setting(self, key, default=None):
+            return self.settings.get(key, default)
+
+        def set_setting(self, key, value):
+            self.settings[key] = value
+
+    shown = []
+    monkeypatch.setattr(QMessageBox, "exec", lambda box: shown.append(box.text()) or 0)
+    panel = panel_module.AssistantPanel(Context(), KeyStore(backend=FakeKeychain(), env={}))
+    try:
+        for pid in ("openrouter", "openai"):
+            panel.provider_box.setCurrentIndex(panel.provider_box.findData(pid))
+            assert panel.provider_id == pid
+            panel._confirm_data_sharing(PROVIDERS[pid].display_name, panel.destination())
+        openrouter, openai = shown
+        assert "openrouter.ai" in openrouter and "forwards each request" in openrouter
+        assert "api.openai.com" in openai and "forwards" not in openai
+    finally:
+        panel.shutdown()
+        panel.deleteLater()
+        app.processEvents()

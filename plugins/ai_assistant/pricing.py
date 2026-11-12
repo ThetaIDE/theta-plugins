@@ -60,6 +60,8 @@ def price_for(model: str, overrides: Mapping[str, Any] | None = None) -> tuple[f
             table[str(key)] = prices  # type: ignore[assignment]
     model = (model or "").strip().removeprefix("models/")
     matches = [key for key in table if model == key or model.startswith(key + "-") or model.startswith(key + "@")]
+    if not matches and "/" in model:  # OpenRouter-style "vendor/model": try the vendor's own name
+        return price_for(model.rsplit("/", 1)[1], overrides)
     return table[max(matches, key=len)] if matches else None
 
 

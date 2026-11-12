@@ -13,6 +13,7 @@ Pick a provider and model at the top of the panel:
 | OpenAI | `OPENAI_API_KEY` or keychain | **Server URL** also accepts any OpenAI-compatible server (vLLM, LM Studio). |
 | Anthropic | `ANTHROPIC_API_KEY` or keychain | |
 | Google Gemini | `GEMINI_API_KEY` or keychain | |
+| OpenRouter | `OPENROUTER_API_KEY` or keychain | One key for models from many vendors. Model ids look like `anthropic/claude-sonnet-4.5`; press **↻** for the full list. |
 | Ollama (local) | none | Runs on your machine at `http://localhost:11434`. No data leaves the computer. |
 
 The model box accepts any model id. Press **↻** to list the models your key can use.
@@ -25,7 +26,11 @@ If there is no secure keychain, the plugin will not save the key at all, so it n
 
 ### What leaves your computer
 
-The first time you send a message to a cloud provider, a notice lists what that provider will receive: your messages, the run configs, log excerpts, metric summaries and file contents the assistant reads, and the names of your config files. Nothing is sent unless you press **Send**. If you cancel, your message stays in the box. The notice appears once for each provider and server. Ollama, and any server on `localhost`, never shows it, because nothing leaves the machine.
+The first time you send a message to a cloud provider, a notice lists what that provider will receive: your messages, the run configs, log excerpts, metric summaries and file contents the assistant reads, and the names of your config files. Nothing is sent unless you press **Send**. If you cancel, your message stays in the box. The notice appears once for each provider and server. Ollama, and any server on `localhost`, never shows it, because nothing leaves the machine. For OpenRouter, the notice also explains that it forwards each request to the company serving the chosen model, whose terms apply too.
+
+### AI can make mistakes
+
+A line under the message box says so. The assistant's diagnoses, comparisons and suggested hyperparameters can be wrong, and its file changes can be too. Check important answers against the logs and metrics, and read each diff before you approve it.
 
 ## What it can see and do
 
@@ -65,7 +70,7 @@ The assistant's instructions start with a compact list of every config in `in/co
 
 The status line reports tokens and an estimated cost, for example `12,400 in (11,800 cached) / 350 out tokens · 2 steps · ≈ $0.0081 (chat ≈ $0.042)`. The chat total is saved with the chat.
 
-The estimate uses list prices from `pricing.py`, checked in November 2026. Cached input is charged at the cached rate. Cache writes count as ordinary input, so the first message of a chat runs slightly low. Models missing from the table get no estimate rather than a guess, and Ollama is free. Prices change, so you can override or add them in the plugin's `prices` setting (US dollars per million tokens: input, cached input, output), for example `{"my-finetune": [3.0, 0.3, 12.0]}`. This is an estimate; your provider's billing page is the actual cost.
+The estimate uses list prices from `pricing.py`, checked in November 2026. Cached input is charged at the cached rate. Cache writes count as ordinary input, so the first message of a chat runs slightly low. Models missing from the table get no estimate rather than a guess, and Ollama is free. OpenRouter reports what each request cost, so its figure is used instead of the table. Prices change, so you can override or add them in the plugin's `prices` setting (US dollars per million tokens: input, cached input, output), for example `{"my-finetune": [3.0, 0.3, 12.0]}`. This is an estimate; your provider's billing page is the actual cost.
 
 ## Watching training runs
 

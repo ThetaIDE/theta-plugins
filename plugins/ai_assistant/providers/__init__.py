@@ -1,6 +1,6 @@
-"""LLM provider adapters behind one interface. Importing this package registers all four."""
+"""LLM provider adapters behind one interface. Importing this package registers every provider."""
 
-from . import anthropic, gemini, ollama, openai  # noqa: F401  (registration side effect)
+from . import anthropic, gemini, ollama, openai, openrouter  # noqa: F401  (registration side effect)
 from .base import PROVIDERS, ProviderAdapter, ProviderConfig, create_provider
 from .chat_types import (
     AuthenticationError,

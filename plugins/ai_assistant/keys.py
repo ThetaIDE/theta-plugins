@@ -18,6 +18,7 @@ ENV_VARS = {
     "anthropic": "ANTHROPIC_API_KEY",
     "gemini": "GEMINI_API_KEY",
     "ollama": "OLLAMA_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
 }
 
 # Backends that would store the secret unencrypted, or not at all.

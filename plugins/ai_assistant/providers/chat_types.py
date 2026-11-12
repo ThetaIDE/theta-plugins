@@ -51,17 +51,21 @@ class Message:
 @dataclass(frozen=True)
 class Usage:
     """Token counts. input_tokens is the whole prompt; cached_input_tokens is the part read from the
-    provider's prompt cache (billed at a fraction of the normal rate)."""
+    provider's prompt cache (billed at a fraction of the normal rate). cost is the charge in US dollars
+    when the provider reports it (OpenRouter does); None means "not reported", so estimate from prices."""
 
     input_tokens: int = 0
     output_tokens: int = 0
     cached_input_tokens: int = 0
+    cost: float | None = None
 
     def __add__(self, other: Usage) -> Usage:
+        costs = [c for c in (self.cost, other.cost) if c is not None]
         return Usage(
             self.input_tokens + other.input_tokens,
             self.output_tokens + other.output_tokens,
             self.cached_input_tokens + other.cached_input_tokens,
+            sum(costs) if costs else None,
         )
 
 

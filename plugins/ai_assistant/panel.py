@@ -113,9 +113,18 @@ DATA_SHARING = """\
 contents of workspace files it opens</li>
 <li>the names of the config files in <code>in/config</code></li>
 </ul>
-<p>Your API key is sent only to authenticate. What {provider} keeps, and for how long, is set by its API \
+{relay}<p>Your API key is sent only to authenticate. What {provider} keeps, and for how long, is set by its API \
 terms and your account's data settings.</p>
 <p>A local model (Ollama, or an OpenAI-compatible server on this computer) keeps everything on this machine.</p>"""
+
+# Providers that route each request to another company's model; the notice says so.
+RELAY_NOTE = """\
+<p>{provider} is a router: it forwards each request to the company serving the model you chose \
+(for example OpenAI, Anthropic or Google), whose terms also apply.</p>
+"""
+RELAY_PROVIDERS = frozenset({"openrouter"})
+
+DISCLAIMER = "AI can make mistakes. Check its answers and any change before you rely on them."
 
 _FENCE = re.compile(r"^([ \t]*)(`{3,}|~{3,})[^\n]*\n(.*?)^\1\2[ \t]*$", re.DOTALL | re.MULTILINE)
 
@@ -394,6 +403,13 @@ class AssistantPanel(QWidget):
         bottom.addWidget(self.send_button)
         layout.addLayout(bottom)
 
+        self.disclaimer = QLabel(DISCLAIMER)
+        self.disclaimer.setObjectName("muted")
+        self.disclaimer.setWordWrap(True)
+        self.disclaimer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.disclaimer.setStyleSheet("font-size: 11px;")
+        layout.addWidget(self.disclaimer)
+
     # ── Provider selection & settings ───────────────────────────────────────
 
     @property
@@ -517,7 +533,9 @@ class AssistantPanel(QWidget):
         box.setIcon(QMessageBox.Icon.Information)
         box.setWindowTitle("Send workspace data to " + provider + "?")
         box.setTextFormat(Qt.TextFormat.RichText)
-        box.setText(DATA_SHARING.format(provider=html.escape(provider), host=html.escape(host)))
+        name = html.escape(provider)
+        relay = RELAY_NOTE.format(provider=name) if self.provider_id in RELAY_PROVIDERS else ""
+        box.setText(DATA_SHARING.format(provider=name, host=html.escape(host), relay=relay))
         send = box.addButton("Send", QMessageBox.ButtonRole.AcceptRole)
         cancel = box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
         box.setDefaultButton(cancel)
@@ -777,6 +795,8 @@ class AssistantPanel(QWidget):
         self._done(status)
 
     def _turn_cost(self, usage) -> float | None:
+        if usage.cost is not None:  # the provider's own figure beats our estimate
+            return usage.cost
         if self.provider_id in FREE_PROVIDERS:
             return None
         model = self.agent.provider.config.model if self.agent is not None else self._provider_config().model
