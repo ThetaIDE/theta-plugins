@@ -3,7 +3,7 @@
   "name": "Theta MCP Server",
   "version": "1.0.0",
   "description": "Let Claude Code, Codex, pi, opencode, Cursor and other MCP agents use ThetaIDE: they can list and diagnose runs, read configs, logs and metrics, plot curves, compare variants across seeds, and, with your approval in the IDE, edit configs, launch or stop runs and install Hub components. Runs on 127.0.0.1 with a token; needs no other plugin.",
-  "author": "ThetaIDE Team",
+  "author": "ccast44",
   "default_enabled": true,
   "icon": "theta_mcp",
   "entry_point": "ThetaMCPPlugin",
