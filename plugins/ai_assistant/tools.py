@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import difflib
 import json
+import math
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,6 +26,11 @@ from .figures import PlotError, plot_metrics
 from .providers.chat_types import ToolCall, ToolSpec
 
 MAX_RESULT_CHARS = 12_000
+# Run statuses that are not finished yet.
+PENDING_STATUSES = ("queued", "starting", "running")
+# wait_for_runs: default and longest wait, in minutes. A call that times out can simply be repeated.
+WAIT_DEFAULT_MINUTES = 10
+WAIT_MAX_MINUTES = 60
 
 
 class IDEBridge(Protocol):
@@ -55,7 +62,25 @@ class IDEBridge(Protocol):
 
     def select_experiment(self, path: str) -> str: ...
 
-    def launch_current(self) -> str: ...
+    def describe_launch(
+        self, path: str = "", overrides: list[str] | None = None, seeds: list[int] | None = None, label: str = ""
+    ) -> str:
+        """What the user approves; ToolError when the launch could not work (e.g. it does not validate)."""
+        ...
+
+    def launch(
+        self, path: str = "", overrides: list[str] | None = None, seeds: list[int] | None = None, label: str = ""
+    ) -> dict[str, Any] | str:
+        """Queue the experiment at `path` (the selected one if empty) and start the queue."""
+        ...
+
+    def replicate_metrics(self, run_id: str) -> dict[str, dict[str, Any]]:
+        """For a run with several seeds: '<method> · seed <n>' -> {status, metrics}. Empty otherwise."""
+        ...
+
+    # True once the user asked to stop; long waits check it.
+    should_stop: Callable[[], bool]
+    poll_seconds: float
 
     def stop_run(self, run_id: str) -> str: ...
 
@@ -159,6 +184,9 @@ class ToolRegistry:
 
     def names(self) -> list[str]:
         return list(self._tools)
+
+    def tools(self) -> list[Tool]:
+        return list(self._tools.values())
 
     def specs(self, *, include_mutating: bool = True) -> list[ToolSpec]:
         return [t.spec for t in self._tools.values() if include_mutating or not t.mutating]
@@ -295,11 +323,23 @@ def build_ide_tools(bridge: IDEBridge) -> ToolRegistry:
                     }
         shared = {k: v for k, v in finals.items() if len(v) > 1}
         summaries = {r["id"]: r for r in bridge.runs() if r["id"] in ids}
-        return {
+        result: dict[str, Any] = {
             "runs": summaries,
             "config_differences": diff_configs(configs),
             "metrics": shared,
         }
+        seeds = {rid: across_seeds(bridge.replicate_metrics(rid)) for rid in ids}
+        by_metric: dict[str, dict[str, Any]] = {}
+        for rid, stats in seeds.items():
+            for name, stat in stats.items():
+                by_metric.setdefault(name, {})[rid] = stat
+        if by_metric:
+            result["across_seeds"] = {k: v for k, v in sorted(by_metric.items()) if len(v) > 1} or by_metric
+            result["note"] = (
+                "across_seeds: each seed's final value, then their mean and sample std. With few seeds, treat a "
+                "difference smaller than about two standard deviations as inconclusive."
+            )
+        return result
 
     def list_experiments() -> dict:
         return {
@@ -316,8 +356,51 @@ def build_ide_tools(bridge: IDEBridge) -> ToolRegistry:
     def select_experiment(path: str) -> str:
         return bridge.select_experiment(path)
 
-    def launch_experiment() -> str:
-        return bridge.launch_current()
+    def launch_experiment(
+        path: str = "", overrides: list[str] | None = None, seeds: list[int] | None = None, label: str = ""
+    ) -> Any:
+        return bridge.launch(path, as_list(overrides, "overrides"), as_list(seeds, "seeds"), str(label or ""))
+
+    def launch_preview(
+        path: str = "", overrides: list[str] | None = None, seeds: list[int] | None = None, label: str = ""
+    ) -> str:
+        return bridge.describe_launch(path, as_list(overrides, "overrides"), as_list(seeds, "seeds"), str(label or ""))
+
+    def wait_for_runs(run_ids: list[str], timeout_minutes: float = WAIT_DEFAULT_MINUTES) -> dict:
+        if not isinstance(run_ids, list) or not run_ids:
+            raise ToolError("Pass the run ids to wait for (from launch_experiment or list_runs).")
+        ids = list(dict.fromkeys(resolve(r) for r in run_ids[:12]))
+        try:
+            minutes = float(timeout_minutes)
+        except (TypeError, ValueError):
+            minutes = WAIT_DEFAULT_MINUTES
+        minutes = max(0.0, min(minutes, WAIT_MAX_MINUTES))
+        start = time.monotonic()
+        while True:
+            status = {r["id"]: r for r in bridge.runs() if r["id"] in ids}
+            pending = [rid for rid in ids if (status.get(rid) or {}).get("status") in PENDING_STATUSES]
+            waited = time.monotonic() - start
+            if not pending or waited >= minutes * 60 or bridge.should_stop():
+                break
+            time.sleep(min(bridge.poll_seconds, max(0.0, minutes * 60 - waited)))
+        runs = []
+        for rid in ids:
+            run = status.get(rid) or {}
+            entry: dict[str, Any] = {"id": rid, "status": run.get("status"), "label": run.get("label")}
+            if run.get("status") not in PENDING_STATUSES:
+                entry["final"] = final_values(bridge.run_metrics(rid))
+            runs.append(entry)
+        result: dict[str, Any] = {"finished": not pending, "waited_seconds": round(waited), "runs": runs}
+        if pending:
+            result["still_running"] = pending
+            result["note"] = "Not finished yet: call wait_for_runs again to keep waiting."
+        failed = [r["id"] for r in runs if r["status"] not in (*PENDING_STATUSES, "completed")]
+        if failed:
+            result["did_not_complete"] = failed
+            result["hint"] = "get_run_logs explains a failed run."
+        if len(ids) > 1 and not pending:
+            result["next"] = "compare_runs compares them (across seeds, when they had several)."
+        return result
 
     def stop_run(run_id: str = "selected") -> str:
         return bridge.stop_run(resolve(run_id))
@@ -738,10 +821,57 @@ def build_ide_tools(bridge: IDEBridge) -> ToolRegistry:
     registry.register(
         Tool(
             "launch_experiment",
-            "Queue and run the selected experiment. Starts compute; the user is asked to confirm.",
-            _schema(),
+            "Queue and run an experiment; the queue starts it when a worker is free. Starts compute: the user is "
+            "asked to confirm. To compare variants (e.g. a change toggled on and off), launch the same experiment "
+            "once per variant with a label and the overrides that select it, and the same seeds for each; then "
+            "wait_for_runs and compare_runs. The settings are validated before the user is asked.",
+            _schema(
+                {
+                    "path": {
+                        "type": "string",
+                        "description": "The experiment config (experiment/<group>/<name>.yaml or <group>/<name>). "
+                        "Omit for the experiment selected in the IDE.",
+                    },
+                    "overrides": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Hydra command-line overrides for this run only, e.g. "
+                        "['++methods.ppo.use_new_loss=true', 'total_timesteps=20000']. The files are unchanged.",
+                    },
+                    "seeds": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Training seeds. Several run as one job with a run per seed, so results "
+                        "can be compared across seeds (e.g. [1, 2, 3]).",
+                    },
+                    "label": {
+                        "type": "string",
+                        "description": "A short name for this variant, e.g. 'edit-on'. It gets its own results "
+                        "folder, so variants never overwrite each other or earlier results.",
+                    },
+                }
+            ),
             launch_experiment,
             mutating=True,
+            preview=launch_preview,
+            background=True,  # waits for the IDE to validate the experiment
+        )
+    )
+    registry.register(
+        Tool(
+            "wait_for_runs",
+            "Wait until runs finish (or fail), then report each one's status and final metric values. Returns "
+            f"early when all are done; otherwise after timeout_minutes (default {WAIT_DEFAULT_MINUTES}, at most "
+            f"{WAIT_MAX_MINUTES}): call it again to keep waiting.",
+            _schema(
+                {
+                    "run_ids": {"type": "array", "items": {"type": "string"}},
+                    "timeout_minutes": {"type": "number", "description": "How long to wait at most."},
+                },
+                ["run_ids"],
+            ),
+            wait_for_runs,
+            background=True,
         )
     )
     registry.register(
@@ -754,6 +884,52 @@ def build_ide_tools(bridge: IDEBridge) -> ToolRegistry:
         )
     )
     return registry
+
+
+def as_list(value: Any, name: str) -> list:
+    if value in (None, ""):
+        return []
+    if not isinstance(value, list):
+        raise ToolError(f"{name} must be a list.")
+    return value
+
+
+def last_finite(values: list[Any]) -> float | None:
+    for value in reversed(values):
+        if isinstance(value, (int, float)) and math.isfinite(value):
+            return float(value)
+    return None
+
+
+def final_values(series: dict[str, tuple[list[Any], list[Any]]], limit: int = 25) -> dict[str, float | None]:
+    """Each metric's last finite value: what a finished run ended at."""
+    return {name: last_finite(values) for name, (_steps, values) in sorted(series.items())[:limit]}
+
+
+def across_seeds(replicates: dict[str, dict[str, Any]], limit: int = 25) -> dict[str, dict[str, Any]]:
+    """metric -> {n, mean, std, values per seed} from each seed's final value; only with two or more seeds."""
+    if len(replicates) < 2:
+        return {}
+    per_metric: dict[str, dict[str, float]] = {}
+    for seed, replicate in replicates.items():
+        for name, (_steps, values) in (replicate.get("metrics") or {}).items():
+            value = last_finite(values)
+            if value is not None:
+                per_metric.setdefault(name, {})[seed] = value
+    out: dict[str, dict[str, Any]] = {}
+    for name, by_seed in sorted(per_metric.items())[:limit]:
+        values = list(by_seed.values())
+        if len(values) < 2:
+            continue
+        mean = sum(values) / len(values)
+        std = math.sqrt(sum((v - mean) ** 2 for v in values) / (len(values) - 1))
+        out[name] = {
+            "n": len(values),
+            "mean": round(mean, 6),
+            "std": round(std, 6),
+            "per_seed": {seed: round(v, 6) for seed, v in by_seed.items()},
+        }
+    return out
 
 
 def file_diff(path: str, old: str | None, new: str) -> str:

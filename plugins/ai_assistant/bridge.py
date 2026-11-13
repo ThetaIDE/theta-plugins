@@ -7,8 +7,10 @@ the window directly. File access is confined to the workspace.
 from __future__ import annotations
 
 import csv
+import json
 import math
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +23,8 @@ MAX_WRITE_BYTES = 200_000
 # Never written by the assistant, even inside the workspace: VCS, environments, IDE state.
 PROTECTED_PARTS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".thetaide"}
 MAX_METRIC_ROWS = 20_000
+# How long a launch waits for the IDE to validate a newly selected experiment.
+SELECT_TIMEOUT_SECONDS = 180
 
 
 def read_metrics(path: Path) -> dict[str, tuple[list[Any], list[Any]]]:
@@ -127,6 +131,10 @@ class WindowBridge:
         # bridge from the worker thread and use this for anything that touches widgets.
         self.on_gui = lambda fn: fn()
         self.compose = self._compose_with_backend
+        # True when the assistant's user pressed Stop; long waits (launch, wait_for_runs) check it. The panel
+        # points it at its worker; calls from outside agents never see it set.
+        self.should_stop = lambda: False
+        self.poll_seconds = 5.0  # how often wait_for_runs looks at run statuses
         # Charts the assistant draws; the panel points this at <data dir>/assistant/figures.
         self.figures_dir = self.workspace / ".thetaide" / "assistant" / "figures"
 
@@ -157,6 +165,8 @@ class WindowBridge:
             "seed": config.get("seed"),
             "simulated": bool(run.get("simulated")),
             "description": run.get("description") or None,
+            "label": run.get("label") or None,
+            "overrides": run.get("overrides") or None,
         }
 
     def snapshot(self) -> dict[str, Any]:
@@ -181,6 +191,8 @@ class WindowBridge:
     def run_config(self, run_id: str) -> dict[str, Any]:
         run = self._run(run_id)
         result: dict[str, Any] = {"summary": dict(run.get("config") or {})}
+        if run.get("overrides") or run.get("label"):
+            result["launch"] = {"label": run.get("label"), "overrides": list(run.get("overrides") or [])}
         folder = self._run_folder(run)
         if folder is not None:
             import yaml
@@ -201,7 +213,50 @@ class WindowBridge:
         return getter(run)
 
     def run_metrics(self, run_id: str) -> dict[str, tuple[list[Any], list[Any]]]:
-        return self.metric_source(self._run(run_id)).load()
+        series = self.metric_source(self._run(run_id)).load()
+        if series:
+            return series
+        # A run with several seeds keeps each seed's metrics in its own folder: name them per seed.
+        return {
+            f"{seed}: {name}": data
+            for seed, replicate in self.replicate_metrics(run_id).items()
+            for name, data in replicate["metrics"].items()
+        }
+
+    def replicate_metrics(self, run_id: str) -> dict[str, dict[str, Any]]:
+        """For a run launched with several seeds: '<method> · seed <n>' -> {status, metrics}. Empty otherwise.
+
+        The pipeline records each seed in results/executions/<group>/<experiment id>/<execution>/manifest.json;
+        the newest execution is the run's."""
+        backend = self._run(run_id).get("backend") or {}
+        logs_dir = getattr(getattr(self.window, "jobs", None), "logs_dir", None)
+        group, experiment_id = backend.get("group"), backend.get("experiment_id")
+        if not (logs_dir and group and experiment_id):
+            return {}
+        results = Path(logs_dir).parent  # <project>/results
+        root = results / "executions" / str(group) / str(experiment_id)
+        try:
+            manifests = sorted(root.glob("*/manifest.json"), key=lambda p: p.stat().st_mtime)
+            manifest = json.loads(manifests[-1].read_text(encoding="utf-8")) if manifests else {}
+        except (OSError, ValueError):
+            return {}
+        replicates: dict[str, dict[str, Any]] = {}
+        for entry in manifest.get("runs") or []:
+            if not isinstance(entry, dict):
+                continue
+            seed = f"{entry.get('method')} · seed {entry.get('training_seed')}"
+            folder = (
+                results.parent
+                / str(entry.get("logs", ""))
+                / str(entry.get("agent", ""))
+                / str(entry.get("version", ""))
+            )
+            try:
+                metrics = read_metrics(folder / "metrics.csv") if (folder / "metrics.csv").is_file() else {}
+            except (OSError, csv.Error):
+                metrics = {}
+            replicates[seed] = {"status": entry.get("status"), "metrics": metrics}
+        return replicates
 
     def metric_source(self, run: dict) -> MetricSource:
         """A snapshot of where a run's metrics live, safe to read from any thread."""
@@ -394,7 +449,7 @@ class WindowBridge:
             raise ToolError(f"No experiment at {path}.")
         return summarize_report(self.compose(name))
 
-    def _compose_with_backend(self, name: str) -> dict[str, Any]:
+    def _compose_with_backend(self, name: str, overrides: list[str] | None = None) -> dict[str, Any]:
         """Compose through the window's backend: its single worker keeps Hydra calls from overlapping
         the IDE's own validation. The callback arrives on the GUI thread; this thread waits for it."""
         backend = getattr(self.window, "backend", None)
@@ -406,7 +461,7 @@ class WindowBridge:
             out.update(data=data, error=error)
             done.set()
 
-        self.on_gui(lambda: backend.compose(name, [], finished))
+        self.on_gui(lambda: backend.compose(name, list(overrides or []), finished))
         if not done.wait(180):
             raise ToolError(f"Validating {name} timed out after 3 minutes.")
         if out["error"] or not isinstance(out["data"], dict):
@@ -466,6 +521,129 @@ class WindowBridge:
             raise ToolError(f"Cannot launch {name}: {reason}.")
         ide_feature(window, "launch_training", "launch runs")()
         return f"Queued {name}. It starts when a worker slot is free; watch it in the Training Monitor."
+
+    @staticmethod
+    def launch_overrides(overrides: list[str] | None, seeds: list[int] | None) -> list[str]:
+        """The command-line overrides for a launch: the caller's, then the seeds as a variability panel."""
+        result = [str(o).strip() for o in overrides or [] if str(o).strip()]
+        for item in result:
+            if item.lstrip("+").startswith("experiment_id="):
+                raise ToolError("Do not override experiment_id; give the variant a label instead.")
+        if seeds:
+            if not all(isinstance(s, int) and not isinstance(s, bool) and 0 <= s < 2**32 for s in seeds):
+                raise ToolError("seeds must be non-negative integers.")
+            if len(set(seeds)) != len(seeds):
+                raise ToolError("seeds must not repeat.")
+            if len(seeds) > 1:
+                result.append(f"++variability.training_seeds=[{','.join(str(s) for s in seeds)}]")
+            else:
+                result.append(f"++seed={seeds[0]}")
+        return result
+
+    def describe_launch(
+        self, path: str = "", overrides: list[str] | None = None, seeds: list[int] | None = None, label: str = ""
+    ) -> str:
+        """What the user approves: the experiment, its variant, and that it composes. Raises ToolError (so the
+        user is never asked) when the launch could not work. Called on the worker thread."""
+        name = self._launch_target(path)
+        extra = self.launch_overrides(overrides, seeds)
+        if (extra or label) and not hasattr(self.window, "queue_current"):
+            raise ToolError("This ThetaIDE build cannot launch with overrides, seeds or a label. Update ThetaIDE.")
+        report = summarize_report(self.compose(name, extra))
+        if not report["valid"]:
+            raise ToolError(f"{name} would not run with these settings:\n" + "\n".join(report.get("errors", [])))
+        lines = [f"Experiment: {name}"]
+        if label:
+            lines.append(f"Variant: {label}")
+        lines += [f"Override: {o}" for o in extra]
+        lines.append("✓ Validated by the training pipeline with these settings.")
+        return "\n".join(lines)
+
+    def _launch_target(self, path: str) -> str:
+        if not path:
+            name = self.on_gui(lambda: getattr(self.window, "current_experiment", None))
+            if not name:
+                raise ToolError("No experiment is selected. Pass the experiment's path.")
+            return name
+        # Accept a config path (experiment/g/x.yaml, g/x.yaml) or a Hydra name (g/x).
+        bare = path.strip().removeprefix("experiment/")
+        bare = bare if bare.endswith((".yaml", ".yml")) else f"{bare}.yaml"
+        name = self._experiment_name(path) if path.endswith((".yaml", ".yml")) else None
+        name = name or self._experiment_name(f"experiment/{bare}")
+        if name is None or not (self._config_root() / "experiment" / f"{name}.yaml").is_file():
+            raise ToolError(f"{path} is not an experiment config. Call list_experiments for valid paths.")
+        return name
+
+    def launch(
+        self, path: str = "", overrides: list[str] | None = None, seeds: list[int] | None = None, label: str = ""
+    ) -> dict[str, Any] | str:
+        """Queue an experiment, optionally as a labelled variant with extra overrides and seeds, and start the
+        queue. Called on the worker thread: selecting an experiment means waiting for the IDE to validate it."""
+        name = self._launch_target(path)
+        extra = self.launch_overrides(overrides, seeds)
+        window = self.window
+        if not hasattr(window, "queue_current"):
+            if extra or label:
+                raise ToolError("This ThetaIDE build cannot launch with overrides, seeds or a label. Update ThetaIDE.")
+            if path:
+                self.on_gui(lambda: self.select_experiment(f"experiment/{name}.yaml"))
+                self._await_selection(name)
+            return self.on_gui(self.launch_current)
+        if self.on_gui(lambda: getattr(window, "current_experiment", None)) != name:
+            self.on_gui(lambda: self.select_experiment(f"experiment/{name}.yaml"))
+        self._await_selection(name)
+        try:
+            from src.app.services.config_service import LaunchError
+        except ImportError:  # only outside ThetaIDE (tests): queue_current raises it, so the IDE has it
+            LaunchError = RuntimeError  # noqa: N806
+
+        def queue() -> dict:
+            try:
+                run = window.queue_current(start=True, extra_overrides=extra, label=label, strict=True)
+            except LaunchError as exc:
+                raise ToolError(f"Cannot launch {name}: {exc}") from exc
+            if run is None:
+                raise ToolError(f"Cannot launch {name}; see the IDE's console.")
+            return run
+
+        run = self.on_gui(queue)
+        backend = run.get("backend") or {}
+        return {
+            "run_id": run.get("id"),
+            "experiment": name,
+            "results": f"{backend.get('group')}/{backend.get('experiment_id')}",
+            "label": label or None,
+            "overrides": extra,
+            "status": run.get("status"),
+            "next": "Call wait_for_runs with this run_id (and any others) to wait for the results.",
+        }
+
+    def _await_selection(self, name: str) -> None:
+        """Wait until the IDE has validated `name` as the selected experiment."""
+        window = self.window
+        deadline = time.monotonic() + SELECT_TIMEOUT_SECONDS
+
+        def state() -> tuple:
+            timer = getattr(window, "compose_timer", None)
+            pending = bool(timer is not None and timer.isActive())
+            return (
+                getattr(window, "current_experiment", None),
+                pending,
+                bool(getattr(window, "compose_valid", False)),
+                getattr(window, "compose_error", None),
+            )
+
+        while True:
+            current, pending, valid, error = self.on_gui(state)
+            if current == name and not pending and (valid or error):
+                if not valid:
+                    raise ToolError(f"Cannot launch {name}: {error}")
+                return
+            if self.should_stop():
+                raise ToolError("Stopped before the experiment was launched.")
+            if time.monotonic() > deadline:
+                raise ToolError(f"ThetaIDE did not finish validating {name} within {SELECT_TIMEOUT_SECONDS} s.")
+            time.sleep(0.2)
 
     def stop_run(self, run_id: str) -> str:
         run = self._run(run_id)

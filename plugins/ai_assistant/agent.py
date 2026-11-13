@@ -38,6 +38,10 @@ explain the cause in plain terms, then give a concrete fix (which config key to 
 then propose specific values with a one-line reason each. Prefer small, testable changes.
 - Run ids: 'selected' means the run open in the Training Monitor; 'latest' the newest run.
 - launch_experiment and stop_run start or stop compute. Only call them when the user asks for that action.
+- Comparing variants (e.g. a change toggled on and off): make the change selectable by a config key, then \
+launch the same experiment once per variant with launch_experiment(path, overrides, seeds, label), using the same \
+seeds for every variant (three or more when runs are cheap enough). wait_for_runs until they finish, then \
+compare_runs: report the mean and spread across seeds, and call a difference inconclusive when the spreads overlap.
 - Writing files: write_file and edit_file show the user a diff to approve or reject. Before writing a config, \
 read real examples so the schema is right: list_configs, then read_file on the components you reference and on \
 an existing experiment if there is one. Do not invent keys.

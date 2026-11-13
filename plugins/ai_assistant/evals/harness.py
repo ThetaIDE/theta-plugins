@@ -156,8 +156,19 @@ class ScenarioBridge:
     def select_experiment(self, path: str) -> str:
         return self._act("select", path)
 
-    def launch_current(self) -> str:
-        return self._act("launch")
+    def describe_launch(self, path: str = "", overrides=None, seeds=None, label: str = "") -> str:
+        return f"Launch {path or 'the selected experiment'}"
+
+    def launch(self, path: str = "", overrides=None, seeds=None, label: str = "") -> str:
+        return self._act("launch", path, overrides, seeds, label)
+
+    def replicate_metrics(self, run_id: str) -> dict:
+        return {}
+
+    poll_seconds = 0.0
+
+    def should_stop(self) -> bool:
+        return False
 
     def stop_run(self, run_id: str) -> str:
         return self._act("stop", run_id)

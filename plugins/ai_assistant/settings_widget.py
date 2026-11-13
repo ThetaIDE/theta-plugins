@@ -83,7 +83,9 @@ class AssistantSettings(QWidget):
         )
         self.max_steps.valueChanged.connect(lambda v: self._set("max_steps", v))
         limits.addRow("Action steps per message", self.max_steps)
-        self.auto = QCheckBox("Launch and stop runs without asking (file changes and Hub installs always ask)")
+        self.auto = QCheckBox(
+            "Launch and stop runs without asking (overrides, file changes and Hub installs always ask)"
+        )
         self.auto.setChecked(bool(context.get_setting("auto_approve_actions", False)))
         self.auto.toggled.connect(lambda v: self._set("auto_approve_actions", bool(v)))
         limits.addRow("", self.auto)

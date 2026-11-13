@@ -397,9 +397,28 @@ class FakeBridge:
         self.actions.append(("select", path))
         return f"Selected {path}"
 
-    def launch_current(self):
-        self.actions.append(("launch",))
+    def launch(self, path="", overrides=None, seeds=None, label=""):
+        options = tuple(x for x in (path, overrides, seeds, label) if x)
+        self.actions.append(("launch", *options))
         return "Queued"
+
+    def describe_launch(self, path="", overrides=None, seeds=None, label=""):
+        if any("bad" in o for o in overrides or []):
+            from plugins.ai_assistant.tools import ToolError
+
+            raise ToolError("would not run: unknown key bad")
+        return f"Experiment: {path or 'selected'}"
+
+    replicates: dict = {}
+
+    def replicate_metrics(self, run_id):
+        return self.replicates.get(run_id, {})
+
+    poll_seconds = 0.0
+    stop_requested = False
+
+    def should_stop(self):
+        return self.stop_requested
 
     def stop_run(self, run_id):
         self.actions.append(("stop", run_id))
@@ -3162,6 +3181,51 @@ def test_panel_buttons_use_the_plugins_svg_icons_and_follow_the_theme(tmp_path):
         close_panel(panel)
 
 
+def test_the_approval_dialog_says_who_asked_and_what_changes():
+    from plugins.ai_assistant.approval import describe_request
+
+    title, summary, preview, is_diff = describe_request("write_file", {"path": "a<b>.yaml"}, "--- /dev/null\n", "Codex")
+    assert (title, is_diff) == ("Create file?", True) and summary == "Codex wants to create <b>a&lt;b&gt;.yaml</b>:"
+    title, summary, _, _ = describe_request("edit_file", {"path": "x.yaml"}, "--- a/x.yaml\n", "The assistant")
+    assert title == "Edit file?" and summary.startswith("The assistant wants to change")
+    _, summary, _, _ = describe_request("launch_experiment", {"label": "edit-on"}, "Experiment: g/x", "pi", "g/x")
+    assert summary == "pi wants to queue and run <b>g/x</b> as <b>edit-on</b>."
+    assert describe_request("stop_run", {"run_id": "r1"}, "ignored", "pi")[2] == ""  # nothing to preview
+    assert describe_request("odd_tool", {}, "p", "pi")[:2] == ("Allow action?", "pi wants to run <b>odd_tool</b>:")
+
+
+def test_the_panel_asks_about_changes_and_reports_the_answer(tmp_path, monkeypatch):
+    from PyQt6.QtWidgets import QApplication
+
+    from plugins.ai_assistant import panel as panel_module
+    from plugins.ai_assistant.keys import KeyStore
+    from plugins.ai_assistant.providers import ToolCall
+
+    app = QApplication.instance() or QApplication([])
+    panel = make_panel(tmp_path, KeyStore(backend=FakeKeychain(), env={}))
+    shown: list[str] = []
+
+    class Dialog:
+        DialogCode = SimpleNamespace(Accepted=1)
+
+        def __init__(self, title, summary, preview, is_diff=False, parent=None):
+            shown.append(summary)
+
+        def exec(self):
+            return 0
+
+    monkeypatch.setattr(panel_module, "ApprovalDialog", Dialog)
+    try:
+        assert (
+            panel._confirm(ToolCall("1", "write_file", {"path": "configs/a.yaml"}), "--- a/configs/a.yaml\n") is False
+        )
+        assert shown[0].startswith("The assistant wants to change")
+        assert "Rejected configs/a.yaml" in panel.status.text()
+    finally:
+        close_panel(panel)
+    app.processEvents()
+
+
 def test_streaming_redraws_only_the_reply_being_written(tmp_path):
     from PyQt6.QtWidgets import QApplication
 
@@ -3415,3 +3479,268 @@ def test_signing_in_from_the_panel_saves_the_key_in_the_keychain(tmp_path, monke
         assert panel.key_bar.isVisible() and not panel.sign_in_button.isVisible()  # OpenAI has no sign-in
     finally:
         close_panel(panel)
+
+
+# ── Comparing variants: launch with overrides and seeds, wait, compare across seeds ──
+
+
+def test_launch_experiment_passes_the_variant_and_validates_it_before_asking():
+    bridge = FakeBridge()
+    registry = build_ide_tools(bridge)
+    assert registry.runs_in_background("launch_experiment")  # waits for the IDE to validate the selection
+    arguments = {
+        "path": "experiment/g/cartpole.yaml",
+        "overrides": ["++methods.ppo.use_edit=true"],
+        "seeds": [1, 2, 3],
+        "label": "edit-on",
+    }
+    assert registry.preview(ToolCall("c", "launch_experiment", arguments)).startswith("Experiment: experiment/g/")
+    assert not run_tool(registry, "launch_experiment", **arguments).is_error
+    assert bridge.actions == [
+        ("launch", "experiment/g/cartpole.yaml", ["++methods.ppo.use_edit=true"], [1, 2, 3], "edit-on")
+    ]
+    from plugins.ai_assistant.tools import ToolError
+
+    with pytest.raises(ToolError, match="unknown key"):  # the user is never asked about a launch that cannot run
+        registry.preview(ToolCall("c", "launch_experiment", {"overrides": ["bad=1"]}))
+    assert run_tool(registry, "launch_experiment", overrides="x=1").content == "overrides must be a list."
+
+
+def test_wait_for_runs_returns_when_they_finish_with_their_final_values():
+    bridge = FakeBridge()
+    bridge.run_records[0]["status"] = "running"
+    polls = {"n": 0}
+    runs = bridge.runs
+
+    def progressing():
+        polls["n"] += 1
+        if polls["n"] == 3:
+            bridge.run_records[0]["status"] = "completed"
+        return runs()
+
+    bridge.runs = progressing
+    result = json.loads(run_tool(build_ide_tools(bridge), "wait_for_runs", run_ids=["r2", "r1"]).content)
+    assert result["finished"] and polls["n"] >= 3
+    assert [r["status"] for r in result["runs"]] == ["completed", "completed"]
+    assert result["runs"][1]["final"] == {"train/loss": 0.28}
+    assert result["runs"][0]["final"] == {"train/loss": 4.0}  # the last finite value, not NaN
+    assert "compare_runs" in result["next"]
+
+
+def test_wait_for_runs_gives_up_at_its_timeout_or_on_stop():
+    bridge = FakeBridge()
+    bridge.run_records[0]["status"] = "queued"
+    registry = build_ide_tools(bridge)
+    result = json.loads(run_tool(registry, "wait_for_runs", run_ids=["r2"], timeout_minutes=0).content)
+    assert not result["finished"] and result["still_running"] == ["r2"] and "again" in result["note"]
+    assert "final" not in result["runs"][0]
+    bridge.stop_requested = True
+    result = json.loads(run_tool(registry, "wait_for_runs", run_ids=["r2"], timeout_minutes=30).content)
+    assert not result["finished"]
+    bridge.run_records[0]["status"] = "failed"
+    result = json.loads(run_tool(registry, "wait_for_runs", run_ids=["r2"]).content)
+    assert result["did_not_complete"] == ["r2"] and "get_run_logs" in result["hint"]
+    assert run_tool(registry, "wait_for_runs", run_ids=["nope"]).is_error
+
+
+def test_compare_runs_reports_mean_and_spread_across_seeds():
+    bridge = FakeBridge()
+
+    def seeds(*finals):
+        return {
+            f"ppo · seed {i}": {"status": "completed", "metrics": {"eval/reward": ([0, 1], [0.0, value])}}
+            for i, value in enumerate(finals, 1)
+        }
+
+    bridge.replicates = {"r1": seeds(100.0, 110.0, 120.0), "r2": seeds(150.0, 160.0, 170.0)}
+    result = json.loads(run_tool(build_ide_tools(bridge), "compare_runs", run_ids=["r1", "r2"]).content)
+    reward = result["across_seeds"]["eval/reward"]
+    assert reward["r1"]["mean"] == 110.0 and reward["r1"]["std"] == 10.0 and reward["r1"]["n"] == 3
+    assert reward["r2"]["mean"] == 160.0 and reward["r2"]["per_seed"]["ppo · seed 3"] == 170.0
+    assert "inconclusive" in result["note"]
+    bridge.replicates = {}
+    assert "across_seeds" not in json.loads(
+        run_tool(build_ide_tools(bridge), "compare_runs", run_ids=["r1", "r2"]).content
+    )
+
+
+def test_bridge_turns_seeds_into_overrides_and_refuses_experiment_id():
+    from plugins.ai_assistant.bridge import WindowBridge
+    from plugins.ai_assistant.tools import ToolError
+
+    assert WindowBridge.launch_overrides(["a=1", " "], [3, 1, 2]) == ["a=1", "++variability.training_seeds=[3,1,2]"]
+    assert WindowBridge.launch_overrides([], [7]) == ["++seed=7"]
+    assert WindowBridge.launch_overrides(None, None) == []
+    for overrides, seeds in ((["++experiment_id=x"], None), (None, [1, 1]), (None, [-1]), (None, [True])):
+        with pytest.raises(ToolError):
+            WindowBridge.launch_overrides(overrides, seeds)
+
+
+def test_bridge_reads_each_seeds_metrics_from_the_execution_manifest(tmp_path):
+    from plugins.ai_assistant.bridge import WindowBridge
+
+    results = tmp_path / "results"
+    execution = results / "executions" / "g" / "cartpole-edit-on" / "abc"
+    execution.mkdir(parents=True)
+    runs = []
+    for index, (seed, reward) in enumerate(((1, 90.0), (2, 110.0))):
+        version = results / "logs" / "g" / "cartpole-edit-on_20261113_abc" / "ppo" / f"version_{index}"
+        version.mkdir(parents=True)
+        (version / "metrics.csv").write_text(f"step,eval/reward\n0,0\n100,{reward}\n")
+        runs.append(
+            {
+                "method": "ppo",
+                "training_seed": seed,
+                "status": "completed",
+                "logs": "results/logs/g/cartpole-edit-on_20261113_abc",
+                "agent": "ppo",
+                "version": f"version_{index}",
+            }
+        )
+    (execution / "manifest.json").write_text(json.dumps({"runs": runs}))
+    record = {"id": "r9", "backend": {"group": "g", "experiment_id": "cartpole-edit-on"}, "label": "edit-on"}
+    window = SimpleNamespace(
+        runs=[record], jobs=SimpleNamespace(logs_dir=results / "logs"), run_folder=lambda run: None
+    )
+    bridge = WindowBridge(window, tmp_path)
+    replicates = bridge.replicate_metrics("r9")
+    assert list(replicates) == ["ppo · seed 1", "ppo · seed 2"]
+    assert replicates["ppo · seed 2"]["metrics"]["eval/reward"] == ([0.0, 100.0], [0.0, 110.0])
+    assert set(bridge.run_metrics("r9")) == {"ppo · seed 1: eval/reward", "ppo · seed 2: eval/reward"}
+    assert bridge.runs()[0]["label"] == "edit-on"
+
+
+def _launch_window(tmp_path, **extra):
+    from plugins.ai_assistant.bridge import WindowBridge
+
+    config = tmp_path / "in" / "config"
+    (config / "experiment" / "g").mkdir(parents=True)
+    (config / "experiment" / "g" / "cartpole.yaml").write_text("seed: 1\n")
+    queued = []
+    window = SimpleNamespace(current_experiment=None, compose_valid=False, compose_error=None, **extra)
+
+    def opened(path, rel):  # the IDE validates a newly selected experiment
+        window.current_experiment = "g/cartpole"
+        window.compose_valid = True
+
+    window.on_config_file_opened = opened
+    bridge = WindowBridge(window, tmp_path)
+    bridge._config_root = lambda: config
+    return bridge, window, queued
+
+
+def test_bridge_launch_selects_waits_for_validation_and_queues_the_variant(tmp_path):
+    bridge, window, queued = _launch_window(tmp_path)
+
+    def queue_current(**options):
+        queued.append(options)
+        return {"id": "r7", "status": "queued", "backend": {"group": "g", "experiment_id": "cartpole-edit-on"}}
+
+    window.queue_current = queue_current
+    result = bridge.launch("g/cartpole", ["++methods.ppo.use_edit=true"], [1, 2], "edit-on")
+    assert queued == [
+        {
+            "start": True,
+            "extra_overrides": ["++methods.ppo.use_edit=true", "++variability.training_seeds=[1,2]"],
+            "label": "edit-on",
+            "strict": True,
+        }
+    ]
+    assert result["run_id"] == "r7" and result["results"] == "g/cartpole-edit-on" and "wait_for_runs" in result["next"]
+
+    try:
+        from src.app.services.config_service import LaunchError
+    except ImportError:
+        LaunchError = RuntimeError  # noqa: N806
+
+    def refused(**options):
+        raise LaunchError("An active or queued job already uses these results.")
+
+    window.queue_current = refused
+    from plugins.ai_assistant.tools import ToolError
+
+    with pytest.raises(ToolError, match="already uses"):
+        bridge.launch("experiment/g/cartpole.yaml")
+    with pytest.raises(ToolError, match="not an experiment"):
+        bridge.launch("g/missing")
+
+
+def test_bridge_launch_on_an_older_ide_refuses_options_but_still_launches(tmp_path):
+    from plugins.ai_assistant.tools import ToolError
+
+    launched = []
+    bridge, window, _ = _launch_window(tmp_path, check_missing_components=lambda: [])
+    window.launch_training = lambda: launched.append(window.current_experiment)
+    with pytest.raises(ToolError, match="Update ThetaIDE"):
+        bridge.launch("g/cartpole", ["a=1"])
+    with pytest.raises(ToolError, match="Update ThetaIDE"):
+        bridge.describe_launch("g/cartpole", label="x")
+    assert bridge.launch("g/cartpole").startswith("Queued g/cartpole")
+    assert launched == ["g/cartpole"]
+
+
+def test_bridge_describe_launch_validates_with_the_overrides(tmp_path):
+    from plugins.ai_assistant.tools import ToolError
+
+    bridge, window, _ = _launch_window(tmp_path, queue_current=lambda **_: None)
+    composed = []
+
+    def compose(name, overrides=None):
+        composed.append((name, overrides))
+        bad = any("bad" in o for o in overrides or [])
+        return {
+            "experiment": name,
+            "valid": not bad,
+            "errors": [{"stage": "compose", "message": "no key bad"}] if bad else [],
+        }
+
+    bridge.compose = compose
+    text = bridge.describe_launch("g/cartpole", ["lr=0.1"], [1, 2], "fast")
+    assert text.splitlines() == [
+        "Experiment: g/cartpole",
+        "Variant: fast",
+        "Override: lr=0.1",
+        "Override: ++variability.training_seeds=[1,2]",
+        "✓ Validated by the training pipeline with these settings.",
+    ]
+    assert composed == [("g/cartpole", ["lr=0.1", "++variability.training_seeds=[1,2]"])]
+    with pytest.raises(ToolError, match="no key bad"):
+        bridge.describe_launch("g/cartpole", ["bad=1"])
+
+
+# ── Security: what can happen without the user's say ─────────────────────────
+
+
+def test_auto_approve_covers_plain_launches_and_stops_but_never_overrides():
+    from plugins.ai_assistant.panel import AssistantPanel
+    from plugins.ai_assistant.providers.chat_types import ToolCall
+
+    ok = AssistantPanel.auto_approvable
+    assert ok(ToolCall("1", "stop_run", {"run_id": "latest"}))
+    assert ok(ToolCall("1", "launch_experiment", {"path": "experiment/a.yaml", "seeds": [1, 2], "label": "b"}))
+    assert ok(ToolCall("1", "launch_experiment", {"overrides": []}))
+    # An override can name code for the run to import (e.g. telemetry.sinks=[pkg.mod:Factory]): always ask.
+    assert not ok(ToolCall("1", "launch_experiment", {"overrides": ["telemetry.sinks=[os:system]"]}))
+    assert not ok(ToolCall("1", "write_file", {"path": "a.yaml", "content": ""}))
+    assert not ok(ToolCall("1", "install_component", {"component_id": "x"}))
+
+
+def test_links_in_replies_open_web_pages_and_images_but_not_local_programs(tmp_path, monkeypatch):
+    import os
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PyQt6.QtCore import QUrl
+    from PyQt6.QtWidgets import QApplication
+
+    from plugins.ai_assistant import panel as panel_module
+
+    QApplication.instance() or QApplication([])
+    opened: list[str] = []
+    monkeypatch.setattr(panel_module.QDesktopServices, "openUrl", lambda url: opened.append(url.toString()))
+    image = tmp_path / "curve.png"
+    image.touch()
+    script = tmp_path / "run.sh"
+    script.write_text("echo hi\n")
+    for url in ("https://example.org", f"file://{image}", f"file://{script}", f"file://{tmp_path}"):
+        panel_module.AssistantPanel._on_link(SimpleNamespace(), QUrl(url))
+    assert opened == ["https://example.org", f"file://{image}"]
