@@ -39,9 +39,10 @@ from PyQt6.QtWidgets import (
 )
 
 from .agent import Agent, ToolFinished, ToolStarted, TurnFinished
-from .approval import ApprovalDialog
+from .approval import ApprovalDialog, describe_request
 from .bridge import WindowBridge
 from .chat_store import Chat, ChatStore
+from .figures import is_image
 from .keys import ENV_VARS, KeyStore, KeyStoreError, mask
 from .oauth import OAuthError, OpenRouterSignIn
 from .pricing import FREE_PROVIDERS, estimate, format_cost
@@ -54,7 +55,7 @@ from .providers import (
     ToolCall,
     create_provider,
 )
-from .tools import ToolRegistry, ToolResult, build_ide_tools
+from .tools import ToolError, ToolRegistry, ToolResult, build_ide_tools
 from .ui_style import CrossSpinner, header_button, recolour_icons, stylesheet, svg_icon, theme_colors
 from .watch import INTERVAL_MS, Alert, RunWatcher
 
@@ -396,6 +397,10 @@ class AssistantPanel(QWidget):
         self.bridge.on_gui = self.invoker.invoke
         self.bridge.hub.on_gui = self.invoker.invoke
         self.bridge.hub.cancelled = self.worker.cancel.is_set
+        # Stop ends this assistant's long waits; an outside agent's calls run on other threads and are unaffected.
+        self.bridge.should_stop = lambda: (
+            self.invoker.closing or (QThread.currentThread() is self.thread_ and self.worker.cancel.is_set())
+        )
         self.worker.moveToThread(self.thread_)
         self._start_turn.connect(self.worker.run_turn)
         self._fetch_models.connect(self.worker.list_models)
@@ -987,41 +992,23 @@ class AssistantPanel(QWidget):
             return fn(call)
         return self.invoker.invoke(lambda: fn(call))
 
-    def _confirm(self, call: ToolCall, preview: str) -> bool:
-        """Ask the user. File writes always ask; launch/stop may be pre-approved in Settings."""
-        is_write = call.name in ("write_file", "edit_file")
-        auto = call.name in ("launch_experiment", "stop_run") and self._setting("auto_approve_actions", False)
-        if auto:
+    @staticmethod
+    def auto_approvable(call: ToolCall) -> bool:
+        """What "Launch and stop runs without asking" covers: stopping runs, and launching an experiment as it
+        is (seeds and a label allowed). Overrides always ask: they can change what code a run imports."""
+        if call.name == "stop_run":
             return True
-        path = call.arguments.get("path", "")
-        if is_write:
-            new = preview.startswith("--- /dev/null")
-            title = "Create file?" if new else "Edit file?"
-            summary = f"The assistant wants to {'create' if new else 'change'} <b>{path}</b>:"
-        elif call.name == "launch_experiment":
-            current = self.bridge.snapshot().get("current_experiment") or "the selected experiment"
-            title, summary = (
-                "Launch run?",
-                f"The assistant wants to queue and run <b>{current}</b>.",
-            )
-            preview = ""
-        elif call.name == "install_from_hub":
-            title = "Install from the Component Hub?"
-            summary = f"The assistant wants to install <b>{call.arguments.get('component_id', '')}</b>:"
-        elif call.name == "stop_run":
-            title, summary = (
-                "Stop run?",
-                f"The assistant wants to stop run <b>{call.arguments.get('run_id', 'selected')}</b>.",
-            )
-            preview = ""
-        else:
-            title, summary = (
-                "Allow action?",
-                f"The assistant wants to run <b>{call.name}</b>:",
-            )
-        dialog = ApprovalDialog(title, summary, preview, is_diff=is_write, parent=self)
+        return call.name == "launch_experiment" and not call.arguments.get("overrides")
+
+    def _confirm(self, call: ToolCall, preview: str) -> bool:
+        """Ask the user. File writes always ask; plain launches and stops may be pre-approved in Settings."""
+        if self.auto_approvable(call) and self._setting("auto_approve_actions", False):
+            return True
+        current = self.bridge.snapshot().get("current_experiment") if call.name == "launch_experiment" else None
+        title, summary, shown, is_diff = describe_request(call.name, call.arguments, preview, "The assistant", current)
+        dialog = ApprovalDialog(title, summary, shown, is_diff=is_diff, parent=self)
         approved = dialog.exec() == ApprovalDialog.DialogCode.Accepted
-        self.status.setText(("Approved " if approved else "Rejected ") + (path or call.name))
+        self.status.setText(("Approved " if approved else "Rejected ") + (call.arguments.get("path") or call.name))
         return approved
 
     def ask(self, text: str) -> None:
@@ -1231,7 +1218,10 @@ class AssistantPanel(QWidget):
             if 0 <= index < len(self.entries) and self.entries[index]["kind"] == "tool":
                 self.entries[index]["open"] = not self.entries[index].get("open")
                 self._render(follow=False)
-        elif url.scheme() in ("http", "https", "file", "mailto"):
+        elif url.scheme() in ("http", "https", "mailto"):
+            QDesktopServices.openUrl(url)
+        elif url.isLocalFile() and is_image(Path(url.toLocalFile())):
+            # Only images (the figures): a local link to anything else could open a script in its default app.
             QDesktopServices.openUrl(url)
 
     def _on_turn_finished(self, event: TurnFinished) -> None:

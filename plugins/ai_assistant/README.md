@@ -20,7 +20,7 @@ The model box accepts any model id. Press **↻** to list the models your key ca
 
 ### API keys
 
-When the chosen provider has no key, the panel asks for one right under the model picker: paste it and press **Enter** (or **Save**). A **Get a key ↗** link opens the provider's key page. To change or remove a key later, use the **⋯** menu, which also shows where the current key comes from. You can also use **Settings → Plugins → AI Assistant**.
+When the chosen provider has no key, the panel asks for one right under the model picker: paste it and press **Enter** (or **Save**). A **Get a key ↗** link opens the provider's key page. To change or remove a key later, use the **⋯** menu, which also shows where the current key comes from. You can also use **Settings → Community Plugins → AI Assistant → ⚙**.
 
 **Sign in with OpenRouter.** For OpenRouter you don't need to copy a key: press **Sign in with OpenRouter** (in the key box, or **⋯**). Your browser opens OpenRouter's authorization page. When you approve ThetaIDE there, OpenRouter creates a key labelled "ThetaIDE" in your account and the plugin saves it like a pasted key. This uses OAuth with PKCE and a one-time `localhost` callback, so no client secret is involved and the key never passes through the browser. You can revoke the key in OpenRouter's key settings at any time. OpenAI, Anthropic and Google do not offer a sign-in flow for third-party apps' API access, so for them you paste a key.
 
@@ -52,7 +52,7 @@ The **Why did it fail?**, **Compare last two** and **Tune it** chips under the c
 | `get_run_config` | The configuration a run was launched with, including the saved YAML in its results folder |
 | `get_run_logs` | Errors and full tracebacks from the pipeline output, a warning count, and the last lines |
 | `get_run_metrics` | Each metric in `metrics.csv` reduced to its range, trend, NaN/inf, and notes on divergence, plateaus, or learning that levelled off, plus a downsampled curve |
-| `compare_runs` | Which config values differ between 2–6 runs, and how their final metrics compare |
+| `compare_runs` | Which config values differ between 2–6 runs, and how their final metrics compare. For runs with several seeds, each metric's mean and spread across seeds |
 | `list_experiments`, `list_configs`, `read_file` | Experiment configs, component configs (models, environments, agents, paradigms) and other text files. Access is limited to the workspace. |
 | `write_file`, `edit_file` | Create or change a workspace file, such as a new experiment config. **You approve or reject each change in a dialog that shows its diff.** YAML must parse before anything is saved, and `.git`, `.venv` and `.thetaide` are never written. |
 | `plot_metrics` | Draw logged metrics as line charts, one panel per metric and one line per run (up to six). When a run trained several methods (`ppo:train/reward`, `a2c:train/reward`), each method is a line on the same panel. Optional smoothing and a log axis. **The chart appears in the chat.** |
@@ -61,9 +61,20 @@ The **Why did it fail?**, **Compare last two** and **Tune it** chips under the c
 | `validate_experiment` | Compose and validate an experiment exactly as `run_pipeline.py` would, without running it: the errors, the resolved paradigm, environment and seed, and each method's effective settings. Writing an experiment file runs this automatically, so the assistant fixes errors before it calls the file ready. |
 | `search_hub` | Search the Theta Component Hub for methods, models, environments, data modules, evaluators and suites, and see which are installed |
 | `install_from_hub` | Download and install (or update) a Hub component with its component and pip dependencies, through the same installer as the Hub UI. **You approve each install.** The dialog shows the version, source repository and pip packages. |
-| `launch_experiment`, `stop_run` | Start or stop compute. **Each one asks for your confirmation first.** |
+| `launch_experiment`, `stop_run` | Start or stop compute. **Each one asks for your confirmation first.** A launch can name the experiment and run it as a labelled variant, with extra overrides and several seeds; the settings are validated before you are asked |
+| `wait_for_runs` | Wait until runs finish, then report how each ended and its final metric values |
 
-Paths that start with a config group (`experiment/`, `model/`, …) refer to `in/config`. Other relative paths are relative to the workspace root. The **Launch and stop runs without asking** setting never covers file changes or Hub installs.
+Paths that start with a config group (`experiment/`, `model/`, …) refer to `in/config`. Other relative paths are relative to the workspace root. The **Launch and stop runs without asking** setting never covers file changes, Hub installs or launches with overrides (an override can change what code a run imports).
+
+### Comparing variants
+
+Ask something like *add an option to toggle the new normalization in my model, then compare it on and off*. The assistant makes the change selectable by a config key, then launches the experiment once per variant, for example labelled `norm-on` with `++methods.ppo.model.normalize=true` and `norm-off` with the key set to false, using the same seeds for each. It waits for the runs and compares them, reporting each metric's mean and spread across seeds. You approve each file change and each launch.
+
+Each labelled variant gets its own results folder (`<experiment id>-<label>`), so variants never overwrite each other or earlier results. Overrides apply to that run only; the experiment file is unchanged. The run records its label and overrides, and `compare_runs` shows them among the config differences. Launching with a label, overrides or seeds needs a ThetaIDE build that has `queue_current`; on an older build the assistant can still launch the experiment as it is.
+
+### The same tools for Claude Code and other agents
+
+The **Theta MCP Server** plugin offers these tools (its own copy of them, generated by `scripts/sync_mcp_tools.py`, so it doesn't need this plugin installed) to any agent that speaks the Model Context Protocol, such as Claude Code or Codex in ThetaIDE's terminal. Reads run straight away. Writes, launches, stops and installs show the same approval dialog, naming the agent that asked, and **Launch and stop runs without asking** never applies to outside agents.
 
 ### Figures in the chat
 
@@ -101,7 +112,7 @@ While runs train, the assistant checks their metrics every 30 seconds and flags:
 
 Each problem appears once, as a row above the chat and as an IDE toast (a system notification when ThetaIDE is in the background). **Ask AI** opens the panel and asks about that run with the evidence filled in: what is going wrong, whether to stop it, and what to change. If a reply is already streaming, the question waits in the message box instead.
 
-Watching is free: it reads `metrics.csv` locally, re-reads a file only when it changed, and does the reading off the GUI thread. No model is called until you press **Ask AI**. Turn it off in **Settings → Plugins → AI Assistant**.
+Watching is free: it reads `metrics.csv` locally, re-reads a file only when it changed, and does the reading off the GUI thread. No model is called until you press **Ask AI**. Turn it off in **Settings → Community Plugins → AI Assistant → ⚙**.
 
 ## Measuring answer quality
 
