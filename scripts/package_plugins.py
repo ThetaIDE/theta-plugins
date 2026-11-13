@@ -12,12 +12,18 @@ ROOT = Path(__file__).resolve().parent.parent
 HUB_ROOT = ROOT.parent / "theta-hub"
 DIST = ROOT / "dist"
 HUB_PACKAGES = HUB_ROOT / "packages"
+# Where the Hub serves archives; must match each release "url" the IDE downloads.
+HUB_PACKAGES_URL = "https://raw.githubusercontent.com/ThetaIDE/ThetaHub/main/packages"
+# Native storage-v2 fields the Hub validator requires to match the archive's .theta_component.json.
+NATIVE_FIELDS = ("storage_version", "api_version", "capabilities", "payload", "config_paths")
+PLUGIN_FIELDS = ("default_enabled", "icon", "entry_point", "extra")
 
 COMPONENTS = [
     # UI Plugins
     {"id": "obsidian-notes", "name": "obsidian-0.1.0.zip", "src": ROOT / "plugins" / "obsidian", "kind": "plugin"},
     {"id": "doom-sim", "name": "doom_sim-0.1.0.zip", "src": ROOT / "plugins" / "doom-sim", "kind": "plugin"},
     {"id": "antigravity", "name": "antigravity-0.1.5.zip", "src": ROOT / "plugins" / "antigravity", "kind": "plugin"},
+    {"id": "ai_assistant", "name": "ai_assistant-1.0.0.zip", "src": ROOT / "plugins" / "ai_assistant", "kind": "plugin"},
     # Environments
     {"id": "doom-env", "name": "doom_env-1.0.1.zip", "src": ROOT / "envs" / "doom-env", "kind": "env", "paradigms": ["online_rl"]},
     {"id": "gym_classic_control", "name": "gym_classic_control-1.0.2.zip", "src": ROOT / "envs" / "gym_classic_control", "kind": "env", "paradigms": ["online_rl"]},
@@ -111,7 +117,7 @@ def update_registry_entry(comp: dict, sha256: str, zip_name: str):
                 pass
 
     ver = comp_meta.get("version", "1.0.0")
-    raw_url = f"https://raw.githubusercontent.com/CameronEgb/theta-hub/main/packages/{zip_name}"
+    raw_url = f"{HUB_PACKAGES_URL}/{zip_name}"
 
     if reg_file.exists():
         try:
@@ -168,6 +174,10 @@ def update_registry_entry(comp: dict, sha256: str, zip_name: str):
     if "installed_dirs" in comp_meta:
         entry["installed_dirs"] = comp_meta["installed_dirs"]
 
+    for field in NATIVE_FIELDS + PLUGIN_FIELDS:
+        if field in comp_meta:
+            entry[field] = comp_meta[field]
+
     # Record supported paradigms
     paradigms = comp_meta.get("paradigms") or comp.get("paradigms")
     if paradigms:
@@ -182,6 +192,7 @@ def update_registry_entry(comp: dict, sha256: str, zip_name: str):
         "url": raw_url,
         "sha256": sha256,
         "published_at": datetime.now(timezone.utc).isoformat(),
+        "size_bytes": (HUB_PACKAGES / zip_name).stat().st_size if (HUB_PACKAGES / zip_name).exists() else None,
     }
 
     reg_file.write_text(json.dumps(entry, indent=2) + "\n", encoding="utf-8")

@@ -1,0 +1,87 @@
+{
+  "id": "ai_assistant",
+  "name": "AI Assistant",
+  "version": "1.0.0",
+  "description": "Chat with OpenAI, Anthropic, Gemini, OpenRouter or a local Ollama model about your runs. It reads configs, logs and metrics to explain failures, compare runs and suggest hyperparameters, plots metric curves and shows run figures in the chat, watches training runs for NaN, divergence and stalls, and can edit configs, install Hub components and launch or stop runs with your approval.",
+  "author": "ThetaIDE Team",
+  "default_enabled": true,
+  "icon": "ai_assistant",
+  "entry_point": "AIAssistantPlugin",
+  "extra": {
+    "has_settings": true
+  },
+  "kind": "plugin",
+  "repository": "https://github.com/ThetaIDE/theta-plugins",
+  "license": "MIT",
+  "tags": [
+    "ai",
+    "assistant",
+    "llm",
+    "diagnostics",
+    "openai",
+    "anthropic",
+    "gemini",
+    "openrouter",
+    "ollama"
+  ],
+  "dependencies": {
+    "components": [],
+    "pip": [
+      "keyring>=24"
+    ]
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "ai_assistant",
+      "kind": "plugin",
+      "entry_point": "__init__.py:AIAssistantPlugin"
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "__init__.py",
+      "agent.py",
+      "analysis.py",
+      "approval.py",
+      "bridge.py",
+      "chat_store.py",
+      "figures.py",
+      "evals/__init__.py",
+      "evals/__main__.py",
+      "evals/harness.py",
+      "evals/scenarios.py",
+      "hub.py",
+      "keys.py",
+      "oauth.py",
+      "panel.py",
+      "pricing.py",
+      "providers/__init__.py",
+      "providers/anthropic.py",
+      "providers/base.py",
+      "providers/chat_types.py",
+      "providers/gemini.py",
+      "providers/ollama.py",
+      "providers/openai.py",
+      "providers/openrouter.py",
+      "providers/transport.py",
+      "settings_widget.py",
+      "tools.py",
+      "ui_style.py",
+      "watch.py"
+    ],
+    "resources": [
+      "ai_assistant.svg",
+      "icons/chats.svg",
+      "icons/cross.svg",
+      "icons/more.svg",
+      "icons/new_chat.svg",
+      "icons/refresh.svg",
+      "icons/send.svg",
+      "icons/stop.svg"
+    ],
+    "configs": {}
+  },
+  "config_paths": []
+}
