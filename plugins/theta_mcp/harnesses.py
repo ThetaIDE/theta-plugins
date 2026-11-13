@@ -6,9 +6,9 @@ environment variables:
   agent         without the fixed address (ThetaIDE's terminal)    with it (anywhere), written out
   Claude Code   <project>/.mcp.json  ${THETA_MCP_URL}                  ~/.claude.json
   pi            <project>/.mcp.json  ${THETA_MCP_URL}                  ~/.config/mcp/mcp.json
-  opencode      <project>/opencode.json  {env:THETA_MCP_URL}           ~/.config/opencode/opencode.json
+  opencode      <project>/opencode.json  {env:THETA_MCP_URL}           ~/.config/opencode/opencode.json ($XDG_CONFIG_HOME)
   Cursor        <project>/.cursor/mcp.json  ${env:THETA_MCP_URL}       ~/.cursor/mcp.json
-  Codex         -                                                    ~/.codex/config.toml
+  Codex         -                                                    ~/.codex/config.toml ($CODEX_HOME)
   Antigravity   -                                                    ~/.gemini/config/mcp_config.json
 
 Project files only name the variables, which only terminals opened in ThetaIDE have, so they hold no secret
@@ -20,6 +20,12 @@ variables are unset. Codex (no variables in its URL) and Antigravity (no documen
 Every writer only adds, updates or removes the "thetaide" entry and keeps everything else in the file. A file
 it cannot parse safely (invalid JSON, JSON with comments, an existing hand-written Codex table) is left alone,
 and the message says what to add by hand.
+
+The same paths hold on macOS and Windows (~ is the user's home folder, %USERPROFILE% on Windows): these agents
+keep their config under the home folder on every system. Codex and opencode let the user move theirs with
+$CODEX_HOME and $XDG_CONFIG_HOME, which are followed. "Readable by the user only" is file mode 0600 on macOS and
+Linux; Windows ignores modes, and there the home folder's own permissions (the user, administrators and the system)
+keep the files private.
 """
 
 from __future__ import annotations
@@ -146,6 +152,17 @@ def _shown(path: Path) -> str:
     return f"{path.parent.name}/{path.name}" if path.parent.name.startswith(".") else path.name
 
 
+def _moved(variable: str, home: Path) -> Path | None:
+    """A config folder the user moved with an environment variable ($CODEX_HOME, $XDG_CONFIG_HOME). Followed only
+    for the real home folder: the variables describe this user's agents, not a home given for testing."""
+    value = os.environ.get(variable, "").strip() if home == Path.home() else ""
+    return Path(value).expanduser() if value else None
+
+
+def _codex_file(home: Path) -> Path:
+    return (_moved("CODEX_HOME", home) or home / ".codex") / "config.toml"
+
+
 def _bearer(target: Target) -> dict[str, str]:
     return {"Authorization": f"Bearer {target.token}"}
 
@@ -226,7 +243,7 @@ def _opencode_file(project: Path) -> Path:
 
 
 def _opencode_user_file(home: Path) -> Path:
-    folder = home / ".config" / "opencode"
+    folder = (_moved("XDG_CONFIG_HOME", home) or home / ".config") / "opencode"
     return _first_existing([folder / "opencode.json", folder / "opencode.jsonc"])
 
 
@@ -339,7 +356,7 @@ def _codex_parses(text: str) -> bool:
 def _codex_write(project: Path, home: Path, target: Target) -> str:
     if not target.stable:
         return "Codex: needs the fixed address (turn it on above)."
-    path = home / ".codex" / "config.toml"
+    path = _codex_file(home)
     try:
         text = path.read_text(encoding="utf-8") if path.exists() else ""
     except OSError as exc:
@@ -368,7 +385,7 @@ def _codex_write(project: Path, home: Path, target: Target) -> str:
 
 
 def _codex_remove(project: Path, home: Path) -> str:
-    path = home / ".codex" / "config.toml"
+    path = _codex_file(home)
     try:
         text = path.read_text(encoding="utf-8") if path.exists() else ""
     except OSError as exc:
@@ -398,7 +415,7 @@ HARNESSES: list[Harness] = [
         "opencode",
         False,
         "opencode.json in the project (ThetaIDE's terminal only); with the fixed address, "
-        "~/.config/opencode/opencode.json (any terminal)",
+        "~/.config/opencode/opencode.json, or under $XDG_CONFIG_HOME (any terminal)",
         _opencode_write,
         _opencode_remove,
     ),
@@ -411,7 +428,7 @@ HARNESSES: list[Harness] = [
         _cursor_write,
         _cursor_remove,
     ),
-    Harness("codex", "Codex", True, "~/.codex/config.toml", _codex_write, _codex_remove),
+    Harness("codex", "Codex", True, "~/.codex/config.toml, or $CODEX_HOME/config.toml", _codex_write, _codex_remove),
     Harness(
         "antigravity", "Antigravity", True, "~/.gemini/config/mcp_config.json", _antigravity_write, _antigravity_remove
     ),

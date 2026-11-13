@@ -6,6 +6,7 @@ import base64
 import http.client
 import json
 import struct
+import sys
 import zlib
 from pathlib import Path
 from types import SimpleNamespace
@@ -460,6 +461,14 @@ def _mode(path: Path) -> int:
     return path.stat().st_mode & 0o777
 
 
+WINDOWS = sys.platform == "win32"
+
+
+def _private(path: Path) -> bool:
+    """Readable by the user only: mode 0600. Windows has no modes; the user folder's permissions apply there."""
+    return WINDOWS or _mode(path) == 0o600
+
+
 def test_project_files_name_the_variables_and_keep_other_servers(tmp_path):
     from plugins.theta_mcp import harnesses
 
@@ -536,7 +545,7 @@ def test_cursor_with_the_fixed_address_uses_one_private_global_entry(tmp_path):
     global_file = home / ".cursor" / "mcp.json"
     entry = json.loads(global_file.read_text())["mcpServers"]["thetaide"]
     assert entry == {"url": _stable().url, "headers": {"Authorization": f"Bearer {_stable().token}"}}
-    assert _mode(global_file) == 0o600
+    assert _private(global_file)
     # the project's variable-based entry would win over the global one in the editor, where they are unset
     assert "thetaide" not in json.loads((project / ".cursor" / "mcp.json").read_text())["mcpServers"]
 
@@ -560,7 +569,7 @@ def test_codex_gets_a_marked_block_that_parses_and_keeps_the_rest(tmp_path):
     assert entry["url"] == _stable().url
     assert entry["http_headers"] == {"Authorization": f"Bearer {_stable().token}"}
     assert entry["tool_timeout_sec"] == 120 and entry["default_tools_approval_mode"] == "writes"
-    assert _mode(config) == 0o600
+    assert _private(config)
 
     assert "already lists" in harnesses.configure(["codex"], tmp_path, home, _stable())[0]
     renewed = harnesses.Target(_stable().url, "another-token-" + "y" * 30)
@@ -599,14 +608,14 @@ def test_antigravity_uses_server_url_and_updates_the_older_location_too(tmp_path
             "headers": {"Authorization": f"Bearer {_stable().token}"},
             "timeoutSeconds": 120,
         }
-        assert _mode(path) == 0o600
+        assert _private(path)
 
 
 def test_the_fixed_token_lives_in_a_private_user_file(tmp_path):
     folder = tmp_path / "cfg"
     token = project_config.fixed_token(folder)
     assert project_config.fixed_token(folder) == token and len(token) >= 32
-    assert _mode(folder / "mcp_token") == 0o600
+    assert _private(folder / "mcp_token")
     assert project_config.fixed_token(folder, renew=True) != token
     assert project_config.user_config_dir({"XDG_CONFIG_HOME": "/x"}) in (Path("/x/thetaide"), Path("/x") / "thetaide")
 
@@ -704,7 +713,7 @@ def test_with_the_fixed_address_claude_pi_and_opencode_work_from_any_terminal(tm
         home / ".config" / "mcp" / "mcp.json",
         home / ".config" / "opencode" / "opencode.json",
     ):
-        assert _mode(path) == 0o600
+        assert _private(path)
     assert "thetaide" not in json.loads((project / ".mcp.json").read_text())["mcpServers"]
     assert "thetaide" not in json.loads((project / "opencode.json").read_text())["mcp"]
 
@@ -909,13 +918,42 @@ def test_config_files_are_replaced_whole_keeping_links_and_permissions(tmp_path)
     real.write_text("{}")
     os.chmod(real, 0o640)
     link = tmp_path / ".claude.json"
-    link.symlink_to(real)
+    try:
+        link.symlink_to(real)
+    except OSError:  # Windows without symlink rights
+        pytest.skip("symlinks are not available")
     atomic_write(link, '{"a": 1}\n')
     assert link.is_symlink() and real.read_text() == '{"a": 1}\n'  # the link still points at the dotfile
-    assert _mode(real) == 0o640  # its permissions are kept
+    assert WINDOWS or _mode(real) == 0o640  # its permissions are kept
     atomic_write(link, "{}\n", private=True)
-    assert _mode(real) == 0o600  # holding the token: the user only
+    assert _private(real)  # holding the token: the user only
     fresh = tmp_path / "new" / "token"
     atomic_write(fresh, "t\n", private=True)
-    assert fresh.read_text() == "t\n" and _mode(fresh) == 0o600
+    assert fresh.read_text() == "t\n" and _private(fresh)
     assert [p.name for p in tmp_path.rglob("*.tmp")] == []  # no temporary files left behind
+
+
+def test_moved_config_folders_are_followed_for_the_real_home_only(tmp_path, monkeypatch):
+    from plugins.theta_mcp import harnesses
+
+    home, project = tmp_path / "home", tmp_path / "project"
+    home.mkdir(), project.mkdir()
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    target = _stable()
+
+    # Another home (as in every other test): the variables describe the real user's agents, so they are ignored.
+    harnesses.configure(["codex", "opencode"], project, home, target)
+    assert (home / ".codex" / "config.toml").is_file()
+    assert (home / ".config" / "opencode" / "opencode.json").is_file()
+    assert not (tmp_path / "codex-home").exists() and not (tmp_path / "xdg").exists()
+
+    # The real home: Codex's and opencode's moved folders are where their entries go, and come out of.
+    monkeypatch.setattr(Path, "home", lambda: home)
+    harnesses.configure(["codex", "opencode"], project, home, target)
+    codex = tmp_path / "codex-home" / "config.toml"
+    opencode = tmp_path / "xdg" / "opencode" / "opencode.json"
+    assert "[mcp_servers.thetaide]" in codex.read_text() and _private(codex)
+    assert "thetaide" in json.loads(opencode.read_text())["mcp"] and _private(opencode)
+    harnesses.unconfigure(["codex", "opencode"], project, home)
+    assert "thetaide" not in codex.read_text() and "thetaide" not in json.loads(opencode.read_text())["mcp"]

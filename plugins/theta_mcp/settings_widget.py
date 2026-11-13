@@ -19,7 +19,8 @@ FIXED_HELP = (
     f"Off, agents only find the server in terminals opened in ThetaIDE. On, the server always uses port "
     f"{project_config.FIXED_PORT} and one token, written into each chosen agent's own config file in your home "
     "folder (readable by you only, never in the project), so they work from any terminal or editor while ThetaIDE "
-    "runs. Codex and Antigravity need this. Any program running as you could read the token."
+    "runs. Codex and Antigravity need this, and so does an editor such as Cursor opened from the Dock, Finder or "
+    "Start menu instead of ThetaIDE's terminal. Any program running as you could read the token."
 )
 
 

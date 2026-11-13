@@ -52,12 +52,16 @@ Project files only name the environment variables (`THETA_MCP_URL`, `THETA_MCP_T
 
 With the fixed address, each agent's entry moves to its user-wide file, with the address and token written out, and the project entry is removed. Agents prefer a project entry, and outside ThetaIDE its variables are unset. Either way, ThetaIDE must be running with the server on. Agents act on the workspace open in ThetaIDE, whichever folder they were started in, and approvals appear in ThetaIDE's window.
 
+On macOS and Windows the files are in the same places, under your home folder (`%USERPROFILE%` on Windows): `~/.claude.json`, `~/.codex/config.toml`, and so on. If you moved Codex's folder with `CODEX_HOME`, or your config folder with `XDG_CONFIG_HOME` (used by opencode), the entry goes there instead.
+
+An editor opened from the Dock, Finder or Start menu doesn't see the variables set in ThetaIDE's terminals. So the project file only works for one started from that terminal (for example `cursor .`). Otherwise, turn on the fixed address.
+
 ### The fixed address
 
 To use agents outside ThetaIDE's terminal, turn on **Keep the same address**. Codex and Antigravity need it in any case: Codex can't read its server's address from the environment, and Antigravity's files don't document variables. It makes the server always use port 47321 (or the `port` setting) and one token. It writes that address and token into those agents' files in your home folder.
 
-- The token is kept in `~/.config/thetaide/mcp_token` (`%APPDATA%\thetaide` on Windows), readable by you only. It's never kept in the workspace, whose `.thetaide` folder may be committed.
-- Agents' files that contain it are also made readable by you only.
+- The token is kept in `~/.config/thetaide/mcp_token` (`%APPDATA%\thetaide\mcp_token` on Windows). It's never kept in the workspace, whose `.thetaide` folder may be committed.
+- On macOS and Linux, the token file and agents' files that contain it are made readable by you only (mode 0600). Windows has no file modes. There, these files are private because they're in your user folder, which by default only you, administrators and the system can read.
 - Any program running as you can still read it, so leave this off if you only use agents in ThetaIDE's terminal.
 - **New token** replaces the token and rewrites the files.
 - Turning the option off removes the token from the files.
