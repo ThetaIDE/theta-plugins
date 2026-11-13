@@ -24,6 +24,7 @@ COMPONENTS = [
     {"id": "doom-sim", "name": "doom_sim-0.1.0.zip", "src": ROOT / "plugins" / "doom-sim", "kind": "plugin"},
     {"id": "antigravity", "name": "antigravity-0.1.5.zip", "src": ROOT / "plugins" / "antigravity", "kind": "plugin"},
     {"id": "ai_assistant", "name": "ai_assistant-1.0.0.zip", "src": ROOT / "plugins" / "ai_assistant", "kind": "plugin"},
+    {"id": "theta_mcp", "name": "theta_mcp-1.0.0.zip", "src": ROOT / "plugins" / "theta_mcp", "kind": "plugin"},
     # Environments
     {"id": "doom-env", "name": "doom_env-1.0.1.zip", "src": ROOT / "envs" / "doom-env", "kind": "env", "paradigms": ["online_rl"]},
     {"id": "gym_classic_control", "name": "gym_classic_control-1.0.2.zip", "src": ROOT / "envs" / "gym_classic_control", "kind": "env", "paradigms": ["online_rl"]},
