@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from src.app.core.env_vectorized import VectorizedBaseEnv, ActionCount
+from src.app.api.environments import VectorizedBaseEnv, ActionCount
 
 
 class VectorizedEnv(VectorizedBaseEnv):

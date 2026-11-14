@@ -1,8 +1,8 @@
 {
   "id": "d3rlpy-suite",
   "name": "d3rlpy Offline RL Suite",
-  "version": "1.0.3",
   "kind": "method",
+  "version": "2.0.0",
   "description": "Standard offline reinforcement learning algorithms (CQL, IQL, TD3+BC, BC) powered by d3rlpy.",
   "author": "Takuma Seno & d3rlpy Contributors",
   "tags": [
@@ -14,6 +14,8 @@
     "d3rlpy",
     "baselines"
   ],
+  "storage_version": 3,
+  "api_version": 1,
   "dependencies": {
     "pip": [
       "d3rlpy>=2.8,<3",
@@ -21,6 +23,157 @@
     ],
     "components": []
   },
+  "capabilities": [
+    {
+      "id": "d3rlpy/bc",
+      "kind": "algorithm",
+      "entry_point": "d3rlpy_backend.py:execute",
+      "execution_contract": 1,
+      "backend": "d3rlpy",
+      "paradigms": [
+        "offline_rl"
+      ],
+      "execution_features": {
+        "input_types": [
+          "dataset_path"
+        ],
+        "evaluation": "provider",
+        "resume_modes": [
+          "inference"
+        ],
+        "checkpoint_formats": [
+          "d3rlpy.d3"
+        ],
+        "tuning": false,
+        "winner_promotion": false,
+        "episode_outcomes": false
+      },
+      "resource_hints": {
+        "accelerator": false
+      },
+      "aliases": []
+    },
+    {
+      "id": "d3rlpy/cql",
+      "kind": "algorithm",
+      "entry_point": "d3rlpy_backend.py:execute",
+      "execution_contract": 1,
+      "backend": "d3rlpy",
+      "paradigms": [
+        "offline_rl"
+      ],
+      "execution_features": {
+        "input_types": [
+          "dataset_path"
+        ],
+        "evaluation": "provider",
+        "resume_modes": [
+          "inference"
+        ],
+        "checkpoint_formats": [
+          "d3rlpy.d3"
+        ],
+        "tuning": false,
+        "winner_promotion": false,
+        "episode_outcomes": false
+      },
+      "resource_hints": {
+        "accelerator": false
+      },
+      "aliases": []
+    },
+    {
+      "id": "d3rlpy/iql",
+      "kind": "algorithm",
+      "entry_point": "d3rlpy_backend.py:execute",
+      "execution_contract": 1,
+      "backend": "d3rlpy",
+      "paradigms": [
+        "offline_rl"
+      ],
+      "execution_features": {
+        "input_types": [
+          "dataset_path"
+        ],
+        "evaluation": "provider",
+        "resume_modes": [
+          "inference"
+        ],
+        "checkpoint_formats": [
+          "d3rlpy.d3"
+        ],
+        "tuning": false,
+        "winner_promotion": false,
+        "episode_outcomes": false
+      },
+      "resource_hints": {
+        "accelerator": false
+      },
+      "aliases": []
+    },
+    {
+      "id": "d3rlpy/td3_bc",
+      "kind": "algorithm",
+      "entry_point": "d3rlpy_backend.py:execute",
+      "execution_contract": 1,
+      "backend": "d3rlpy",
+      "paradigms": [
+        "offline_rl"
+      ],
+      "execution_features": {
+        "input_types": [
+          "dataset_path"
+        ],
+        "evaluation": "provider",
+        "resume_modes": [
+          "inference"
+        ],
+        "checkpoint_formats": [
+          "d3rlpy.d3"
+        ],
+        "tuning": false,
+        "winner_promotion": false,
+        "episode_outcomes": false
+      },
+      "resource_hints": {
+        "accelerator": false
+      },
+      "aliases": []
+    },
+    {
+      "id": "d3rlpy/vector",
+      "kind": "model",
+      "entry_point": "d3rlpy_backend.py:create_encoder",
+      "backend": "d3rlpy",
+      "paradigms": [
+        "offline_rl"
+      ],
+      "aliases": []
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "d3rlpy_backend.py"
+    ],
+    "resources": [
+      "requirements.txt"
+    ],
+    "configs": {
+      "agent/d3rlpy/bc.yaml": "configs/agent/d3rlpy/bc.yaml",
+      "agent/d3rlpy/cql.yaml": "configs/agent/d3rlpy/cql.yaml",
+      "agent/d3rlpy/iql.yaml": "configs/agent/d3rlpy/iql.yaml",
+      "agent/d3rlpy/td3_bc.yaml": "configs/agent/d3rlpy/td3_bc.yaml",
+      "model/d3rlpy/vector.yaml": "configs/model/d3rlpy/vector.yaml"
+    }
+  },
+  "config_paths": [
+    "agent/d3rlpy/bc.yaml",
+    "agent/d3rlpy/cql.yaml",
+    "agent/d3rlpy/iql.yaml",
+    "agent/d3rlpy/td3_bc.yaml",
+    "model/d3rlpy/vector.yaml"
+  ],
+  "config_path": "agent/d3rlpy/bc.yaml",
   "parameter_schema": {
     "type": "object",
     "properties": {},
@@ -31,17 +184,23 @@
           "algorithm": {
             "type": "string"
           },
-          "learning_rate": {
-            "type": "string"
+          "backend": {
+            "type": "string",
+            "enum": [
+              "d3rlpy"
+            ]
           },
-          "batch_size": {
-            "type": "integer"
+          "learning_rate": {
+            "type": "number",
+            "exclusiveMinimum": 0
           },
           "n_steps": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 1
           },
-          "entrypoint": {
-            "type": "string"
+          "batch_size": {
+            "type": "integer",
+            "minimum": 1
           }
         }
       },
@@ -51,23 +210,28 @@
           "algorithm": {
             "type": "string"
           },
-          "learning_rate": {
-            "type": "string"
+          "backend": {
+            "type": "string",
+            "enum": [
+              "d3rlpy"
+            ]
           },
-          "batch_size": {
-            "type": "integer"
+          "learning_rate": {
+            "type": "number",
+            "exclusiveMinimum": 0
           },
           "n_steps": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 1
           },
-          "cql_alpha": {
-            "type": "number"
+          "batch_size": {
+            "type": "integer",
+            "minimum": 1
           },
           "gamma": {
-            "type": "number"
-          },
-          "entrypoint": {
-            "type": "string"
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
           }
         }
       },
@@ -77,26 +241,37 @@
           "algorithm": {
             "type": "string"
           },
-          "learning_rate": {
-            "type": "string"
+          "backend": {
+            "type": "string",
+            "enum": [
+              "d3rlpy"
+            ]
           },
-          "batch_size": {
-            "type": "integer"
+          "learning_rate": {
+            "type": "number",
+            "exclusiveMinimum": 0
           },
           "n_steps": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 1
+          },
+          "batch_size": {
+            "type": "integer",
+            "minimum": 1
           },
           "expectile": {
-            "type": "number"
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "exclusiveMaximum": 1
           },
           "weight_temp": {
-            "type": "number"
+            "type": "number",
+            "exclusiveMinimum": 0
           },
           "gamma": {
-            "type": "number"
-          },
-          "entrypoint": {
-            "type": "string"
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
           }
         }
       },
@@ -106,95 +281,58 @@
           "algorithm": {
             "type": "string"
           },
-          "learning_rate": {
-            "type": "string"
+          "backend": {
+            "type": "string",
+            "enum": [
+              "d3rlpy"
+            ]
           },
-          "batch_size": {
-            "type": "integer"
+          "learning_rate": {
+            "type": "number",
+            "exclusiveMinimum": 0
           },
           "n_steps": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 1
+          },
+          "batch_size": {
+            "type": "integer",
+            "minimum": 1
           },
           "alpha": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0
           },
           "gamma": {
-            "type": "number"
-          },
-          "entrypoint": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          }
+        }
+      },
+      "model/d3rlpy/vector.yaml": {
+        "type": "object",
+        "properties": {
+          "architecture": {
             "type": "string"
+          },
+          "hidden_units": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "activation": {
+            "type": "string",
+            "enum": [
+              "relu",
+              "tanh",
+              "elu"
+            ]
           }
         }
       }
     }
-  },
-  "config_paths": [
-    "agent/d3rlpy/bc.yaml",
-    "agent/d3rlpy/cql.yaml",
-    "agent/d3rlpy/iql.yaml",
-    "agent/d3rlpy/td3_bc.yaml"
-  ],
-  "storage_version": 3,
-  "api_version": 1,
-  "capabilities": [
-    {
-      "id": "d3rlpy/bc",
-      "kind": "algorithm",
-      "entry_point": "d3rlpy_runner.py:main",
-      "aliases": [
-        "bc"
-      ],
-      "paradigms": [
-        "offline_rl"
-      ]
-    },
-    {
-      "id": "d3rlpy/cql",
-      "kind": "algorithm",
-      "entry_point": "d3rlpy_runner.py:main",
-      "aliases": [
-        "cql"
-      ],
-      "paradigms": [
-        "offline_rl"
-      ]
-    },
-    {
-      "id": "d3rlpy/iql",
-      "kind": "algorithm",
-      "entry_point": "d3rlpy_runner.py:main",
-      "aliases": [
-        "iql"
-      ],
-      "paradigms": [
-        "offline_rl"
-      ]
-    },
-    {
-      "id": "d3rlpy/td3_bc",
-      "kind": "algorithm",
-      "entry_point": "d3rlpy_runner.py:main",
-      "aliases": [
-        "td3_bc"
-      ],
-      "paradigms": [
-        "offline_rl"
-      ]
-    }
-  ],
-  "payload": {
-    "implementations": [
-      "d3rlpy_runner.py"
-    ],
-    "resources": [
-      "requirements.txt"
-    ],
-    "configs": {
-      "agent/d3rlpy/bc.yaml": "configs/agent/d3rlpy/bc.yaml",
-      "agent/d3rlpy/cql.yaml": "configs/agent/d3rlpy/cql.yaml",
-      "agent/d3rlpy/iql.yaml": "configs/agent/d3rlpy/iql.yaml",
-      "agent/d3rlpy/td3_bc.yaml": "configs/agent/d3rlpy/td3_bc.yaml"
-    }
-  },
-  "config_path": "agent/d3rlpy/bc.yaml"
+  }
 }

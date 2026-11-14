@@ -38,7 +38,7 @@ class CEWSelfOrganizationCallback(_CallbackBase):
         """Find all CEWModel instances attached to the agent via protocols."""
         if self.model is not None and isinstance(self.model, CEWModel):
             return [self.model]
-        from src.app.core.protocols import walk_model_modules
+        from src.app.api.models import walk_model_modules
 
         return [m for m in walk_model_modules(pl_module) if isinstance(m, CEWModel)]
 

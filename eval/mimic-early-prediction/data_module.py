@@ -20,8 +20,8 @@ import torch
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 
-from src.app.core.interfaces import BaseDataModule
-from src.app.core.paradigm_loader import register_component
+from src.app.api.data import BaseDataModule
+from src.app.api.agents import register_component
 from .model import compute_volatility_features, normalize_features
 
 log = logging.getLogger(__name__)
@@ -106,7 +106,9 @@ class EPSepsisDataModule(L.LightningDataModule, BaseDataModule):
         if not dataset_path and hasattr(cfg, "env"):
             ds_name = cfg.env.get("dataset_name", "")
             if ds_name:
-                dataset_path = f"in/datasets/mimic/{ds_name}"
+                from src.app.api.workspace import WorkspacePaths
+
+                dataset_path = str(WorkspacePaths.for_process().datasets / "mimic" / ds_name)
         if not dataset_path:
             raise ValueError(
                 "Dataset path is required for supervised sepsis learning. Specify dataset_path in the config."
@@ -151,7 +153,7 @@ class EPSepsisDataModule(L.LightningDataModule, BaseDataModule):
         _, self.input_dim = self.get_training_sequences()
 
     def _compute_cql_v_values(self, checkpoint: str) -> np.ndarray:
-        from src.app.core.agent_registry import get_agent_class
+        from src.app.api.agents import get_agent_class
         agent_cls = get_agent_class("cql")
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

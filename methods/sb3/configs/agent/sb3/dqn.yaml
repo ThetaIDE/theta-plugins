@@ -1,7 +1,7 @@
 # Stable-Baselines3 DQN (Deep Q-Network)
 compatible_paradigms: [online_rl]
-algorithm: DQN
-entrypoint: package://sb3-suite/sb3_runner.py
+algorithm: sb3/dqn
+backend: sb3
 policy: MlpPolicy
 learning_rate: 1e-4
 buffer_size: 50000

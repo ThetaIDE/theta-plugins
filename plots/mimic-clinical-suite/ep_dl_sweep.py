@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional
 
 import matplotlib.pyplot as plt
 
-from src.app.core.plotting.base import BasePlotter, get_style
+from src.app.api.plotting import BasePlotter, get_style
 
 DISP_MAP = {
     "lstm_no_v": "LSTM (no V)",
@@ -21,8 +21,8 @@ DISP_MAP = {
 
 
 class EpDlSweepPlotter(BasePlotter):
-    def __init__(self):
-        super().__init__("ep_dl_sweep")
+    def __init__(self, *, paths):
+        super().__init__("ep_dl_sweep", paths=paths)
 
     def run(self, exp_id: str, cli_overrides: dict | None = None):
         cfg, group, output_dir = self.get_effective_config(exp_id, cli_overrides)

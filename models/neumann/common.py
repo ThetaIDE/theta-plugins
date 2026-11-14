@@ -1,20 +1,20 @@
 import os
 
-from src.app.services.rulesets import resolve_ruleset
-from src.app.workspace import WorkspacePaths
+from src.app.api.rulesets import resolve_ruleset
+from src.app.api.workspace import WorkspacePaths
 
 from .message_passing import MessagePassingModule
 from .neumann import NEUMANN
 from .reasoning_graph import ReasoningGraphModule
 from .soft_logic import SoftLogic
-from src.app.core.provider_loader import provider_object
-FactsConverter = provider_object('nsfr', 'facts_converter.py:FactsConverter')
-from src.app.core.provider_loader import provider_object
-build_infer_module = provider_object('nsfr', 'utils/logic.py:build_infer_module')
-get_blender_lang = provider_object('nsfr', 'utils/logic.py:get_blender_lang')
-get_lang = provider_object('nsfr', 'utils/logic.py:get_lang')
-from src.app.core.provider_loader import provider_object
-ValuationModule = provider_object('nsfr', 'valuation.py:ValuationModule')
+from src.app.api.packages import provider_export
+FactsConverter = provider_export('nsfr', 'FactsConverter')
+from src.app.api.packages import provider_export
+build_infer_module = provider_export('nsfr', 'build_infer_module')
+get_blender_lang = provider_export('nsfr', 'get_blender_lang')
+get_lang = provider_export('nsfr', 'get_lang')
+from src.app.api.packages import provider_export
+ValuationModule = provider_export('nsfr', 'ValuationModule')
 
 
 def get_neumann_model(env_name: str, rules: str, device: str, train=True, explain=False):

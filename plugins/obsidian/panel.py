@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 )
 
 if TYPE_CHECKING:
-    from frontend.plugins.context import PluginContext
+    from src.app.api.desktop import PluginContext
 
 
 class ObsidianPanel(QWidget):

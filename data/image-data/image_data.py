@@ -14,8 +14,8 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-from src.app.core.datamodule_registry import register_datamodule
-from src.app.core.interfaces import BaseDataModule
+from src.app.api.data import register_datamodule
+from src.app.api.data import BaseDataModule
 
 log = logging.getLogger(__name__)
 

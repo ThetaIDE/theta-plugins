@@ -1,7 +1,7 @@
 """Lightning execution adapter owned by the autoencoder package."""
 import lightning as L
 import torch
-from src.app.core.model_registry import build_model
+from src.app.api.models import build_model
 
 
 class AutoencoderLightningModule(L.LightningModule):

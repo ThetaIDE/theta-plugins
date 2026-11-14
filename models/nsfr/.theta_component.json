@@ -92,5 +92,18 @@
     "configs": {
       "model/nsfr.yaml": "configs/model/nsfr.yaml"
     }
+  },
+  "exports": {
+    "FactsConverter": "facts_converter.py:FactsConverter",
+    "ValuationModule": "valuation.py:ValuationModule",
+    "bool_to_probs": "utils/common.py:bool_to_probs",
+    "build_infer_module": "utils/logic.py:build_infer_module",
+    "get_blender_lang": "utils/logic.py:get_blender_lang",
+    "get_blender_nsfr_model": "common.py:get_blender_nsfr_model",
+    "get_lang": "utils/logic.py:get_lang",
+    "get_nsfr_model": "common.py:get_nsfr_model",
+    "load_module": "utils/common.py:load_module",
+    "subs_list": "fol/logic_ops.py:subs_list",
+    "unify": "fol/logic_ops.py:unify"
   }
 }

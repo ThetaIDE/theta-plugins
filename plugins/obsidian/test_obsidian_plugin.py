@@ -15,7 +15,7 @@ try:
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
     app = QApplication.instance() or QApplication(sys.argv[:1])
     from frontend.app import Window
-    from frontend.plugins.context import PluginContext
+    from src.app.api.desktop import PluginContext
     from .panel import ObsidianPanel
     HAS_PYQT6 = True
 except ImportError:

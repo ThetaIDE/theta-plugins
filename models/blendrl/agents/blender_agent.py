@@ -22,12 +22,12 @@ from captum.attr import (
 )
 from torch.distributions.categorical import Categorical
 
-from src.app.core.provider_loader import provider_object
-get_nsfr_model = provider_object('nsfr', 'common.py:get_nsfr_model')
-from src.app.core.provider_loader import provider_object
-load_module = provider_object('nsfr', 'utils/common.py:load_module')
-from src.app.core.model_registry import register_model
-from src.app.core.types import ActionResult
+from src.app.api.packages import provider_export
+get_nsfr_model = provider_export('nsfr', 'get_nsfr_model')
+from src.app.api.packages import provider_export
+load_module = provider_export('nsfr', 'load_module')
+from src.app.api.models import register_model
+from src.app.api.models import ActionResult
 
 
 def _softor(xs, dim=0, gamma=0.015):
@@ -41,7 +41,7 @@ def _softor(xs, dim=0, gamma=0.015):
 
 def _build_neural_agent(env_name, n_actions, device, arch_name=None, hidden_sizes=None, num_in_features=None,
                         model_options=None):
-    from src.app.core.model_registry import build_model
+    from src.app.api.models import build_model
 
     return build_model(
         arch_name or "dnn",
@@ -437,18 +437,18 @@ def build_blender_module(
         model_params = dict(blender_model) if hasattr(blender_model, "items") else {}
         selected_rules = model_params.get("rules", blender_rules)
         if selected_reasoner == "nsfr":
-            from src.app.core.provider_loader import provider_object
-            get_blender_nsfr_model = provider_object('nsfr', 'common.py:get_blender_nsfr_model')
+            from src.app.api.packages import provider_export
+            get_blender_nsfr_model = provider_export('nsfr', 'get_blender_nsfr_model')
 
             return get_blender_nsfr_model(env.name, selected_rules, device, train=train, explain=explain)
         elif selected_reasoner == "neumann":
-            from src.app.core.provider_loader import provider_object
-            get_blender_neumann_model = provider_object('neumann', 'common.py:get_blender_neumann_model')
-            get_neumann_model = provider_object('neumann', 'common.py:get_neumann_model')
+            from src.app.api.packages import provider_export
+            get_blender_neumann_model = provider_export('neumann', 'get_blender_neumann_model')
+            get_neumann_model = provider_export('neumann', 'get_neumann_model')
 
             return get_blender_neumann_model(env.name, selected_rules, device, train=train, explain=explain)
         if blender_model is not None:
-            from src.app.core.model_registry import build_model
+            from src.app.api.models import build_model
 
             obs = env.reset()
             if isinstance(obs, tuple):
@@ -463,7 +463,7 @@ def build_blender_module(
 
     if blender_mode == "neural":
         if blender_model is not None:
-            from src.app.core.model_registry import build_model
+            from src.app.api.models import build_model
 
             obs = env.reset()
             if isinstance(obs, tuple):
@@ -489,27 +489,6 @@ class BlenderActorCritic(nn.Module):
     BlendeRL actor-critic that supports heterogeneous policy modules.
     Implements CompositeModelProtocol, AuxiliaryLossProtocol, and OptimizerGroupsProtocol.
     """
-
-    @classmethod
-    def get_model_slots(cls):
-        from src.app.core.protocols import ModelSlot
-
-        return [
-            ModelSlot(
-                name="neural",
-                required=True,
-                default="basics/dnn",
-                tags=["neural", "actor"],
-                description="Neural policy/critic actor",
-            ),
-            ModelSlot(
-                name="symbolic",
-                required=False,
-                default="nsfr",
-                tags=["symbolic", "logic"],
-                description="Symbolic/fuzzy logic reasoner",
-            ),
-        ]
 
     def get_routing_weights(self, obs, logic_obs=None):
         if hasattr(self, "actor") and hasattr(self.actor, "to_blender_policy_distribution"):
@@ -713,8 +692,8 @@ class BlenderActorCritic(nn.Module):
                 if m_type == "nsfr" or m_type == "neumann":
                     m_rules = _get_val(m_cfg, "rules", self.get_cfg("rules", "default"))
                     if self.reasoner == "neumann" or m_type == "neumann":
-                        from src.app.core.provider_loader import provider_object
-                        get_neumann_model = provider_object('neumann', 'common.py:get_neumann_model')
+                        from src.app.api.packages import provider_export
+                        get_neumann_model = provider_export('neumann', 'get_neumann_model')
 
                         m = get_neumann_model(env.name, m_rules, device=device, train=True, explain=self.explain)
                     else:
@@ -725,7 +704,7 @@ class BlenderActorCritic(nn.Module):
                         blender_rules = m_rules
                 elif m_type not in ("nsfr", "neumann", "neural"):
                     # Dynamically instantiate from MODEL_REGISTRY without hardcoded classes
-                    from src.app.core.model_registry import build_model
+                    from src.app.api.models import build_model
 
                     m = build_model(
                         m_cfg,
@@ -779,8 +758,8 @@ class BlenderActorCritic(nn.Module):
             # Add Logic modules
             for r in rulesets:
                 if self.reasoner == "neumann":
-                    from src.app.core.provider_loader import provider_object
-                    get_neumann_model = provider_object('neumann', 'common.py:get_neumann_model')
+                    from src.app.api.packages import provider_export
+                    get_neumann_model = provider_export('neumann', 'get_neumann_model')
 
                     la = get_neumann_model(env.name, r, device=device, train=True, explain=self.explain)
                 else:
@@ -808,7 +787,7 @@ class BlenderActorCritic(nn.Module):
         )
 
         # Load logic critic (MLP)
-        from src.app.core.provider_loader import environment_resource
+        from src.app.api.packages import environment_resource
         try:
             mlp_module_path = environment_resource(env.name, "mlp.py")
         except FileNotFoundError:
@@ -898,17 +877,20 @@ class BlenderActorCritic(nn.Module):
         if not builder and hasattr(env_cfg, "get"):
             builder = env_cfg.get("symbolic_observation_builder")
         if builder:
-            if isinstance(builder, str):
+            if isinstance(builder, str) and builder.startswith("export://"):
+                # A package's declared export, e.g. export://gym_classic_control/cartpole_symbolic_observation.
+                from src.app.api.packages import configured_export
+                try:
+                    builder = configured_export(builder)
+                except (ImportError, AttributeError) as exc:
+                    raise ValueError(f"Cannot load symbolic observation builder {builder!r}.") from exc
+            elif isinstance(builder, str):
                 module_name, separator, function_name = builder.rpartition(":")
                 if not separator or not module_name or not function_name:
-                    raise ValueError("A symbolic observation builder must use 'module:function' format.")
+                    raise ValueError("A symbolic observation builder must be 'export://<package>/<name>' "
+                                     "or 'module:function'.")
                 try:
-                    if module_name.startswith('package://'):
-                        from src.app.core.provider_loader import provider_object
-                        package_id, _, relative = module_name[10:].partition('/')
-                        builder = provider_object(package_id, relative + ':' + function_name)
-                    else:
-                        builder = getattr(importlib.import_module(module_name), function_name)
+                    builder = getattr(importlib.import_module(module_name), function_name)
                 except (ImportError, AttributeError) as exc:
                     raise ValueError(f"Cannot load symbolic observation builder {builder!r}.") from exc
             if not callable(builder):

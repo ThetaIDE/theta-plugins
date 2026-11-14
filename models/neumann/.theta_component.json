@@ -88,5 +88,9 @@
     "configs": {
       "model/neumann.yaml": "configs/model/neumann.yaml"
     }
+  },
+  "exports": {
+    "get_blender_neumann_model": "common.py:get_blender_neumann_model",
+    "get_neumann_model": "common.py:get_neumann_model"
   }
 }

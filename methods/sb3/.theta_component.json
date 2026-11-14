@@ -1,8 +1,8 @@
 {
   "id": "sb3-suite",
   "name": "Stable-Baselines3 Suite",
-  "version": "1.1.1",
   "kind": "method",
+  "version": "2.0.0",
   "description": "Standard reinforcement learning algorithms (PPO, DQN, A2C, SAC) powered by Stable-Baselines3.",
   "author": "DLR-RM & SB3 Contributors",
   "tags": [
@@ -12,6 +12,11 @@
     "dqn",
     "sb3"
   ],
+  "paradigms": [
+    "online_rl"
+  ],
+  "storage_version": 3,
+  "api_version": 1,
   "dependencies": {
     "pip": [
       "stable-baselines3",
@@ -20,6 +25,208 @@
     ],
     "components": []
   },
+  "capabilities": [
+    {
+      "id": "sb3/a2c",
+      "kind": "algorithm",
+      "entry_point": "sb3_runner.py:execute",
+      "aliases": [],
+      "paradigms": [
+        "online_rl"
+      ],
+      "episode_outcomes": true,
+      "monitoring": {
+        "supports": [
+          "scalars.v1",
+          "system.v1",
+          "model_observations.v1",
+          "probe_forward.v1",
+          "post_update.v1",
+          "module_interventions.v1",
+          "policy_probabilities.v1"
+        ],
+        "provides": [],
+        "catalog": "monitor_catalog.py:describe"
+      },
+      "execution_contract": 1,
+      "backend": "sb3",
+      "execution_features": {
+        "input_types": [
+          "live_environment"
+        ],
+        "evaluation": "provider",
+        "resume_modes": [
+          "inference"
+        ],
+        "checkpoint_formats": [
+          "sb3.zip"
+        ],
+        "tuning": true,
+        "winner_promotion": true,
+        "episode_outcomes": true,
+        "intermediate_values": true
+      },
+      "resource_hints": {
+        "base_memory_gib": 0.55
+      },
+      "resource_hint_hook": "execution_hooks.py:resource_hints"
+    },
+    {
+      "id": "sb3/dqn",
+      "kind": "algorithm",
+      "entry_point": "sb3_runner.py:execute",
+      "aliases": [],
+      "paradigms": [
+        "online_rl"
+      ],
+      "episode_outcomes": true,
+      "monitoring": {
+        "supports": [
+          "scalars.v1",
+          "system.v1",
+          "model_observations.v1",
+          "probe_forward.v1",
+          "post_update.v1",
+          "module_interventions.v1",
+          "action_values.v1"
+        ],
+        "provides": [],
+        "catalog": "monitor_catalog.py:describe"
+      },
+      "execution_contract": 1,
+      "backend": "sb3",
+      "execution_features": {
+        "input_types": [
+          "live_environment"
+        ],
+        "evaluation": "provider",
+        "resume_modes": [
+          "inference"
+        ],
+        "checkpoint_formats": [
+          "sb3.zip"
+        ],
+        "tuning": true,
+        "winner_promotion": true,
+        "episode_outcomes": true,
+        "intermediate_values": true
+      },
+      "resource_hints": {
+        "base_memory_gib": 0.55
+      },
+      "resource_hint_hook": "execution_hooks.py:resource_hints"
+    },
+    {
+      "id": "sb3/ppo",
+      "kind": "algorithm",
+      "entry_point": "sb3_runner.py:execute",
+      "aliases": [],
+      "paradigms": [
+        "online_rl"
+      ],
+      "episode_outcomes": true,
+      "monitoring": {
+        "supports": [
+          "scalars.v1",
+          "system.v1",
+          "model_observations.v1",
+          "probe_forward.v1",
+          "post_update.v1",
+          "module_interventions.v1",
+          "policy_probabilities.v1"
+        ],
+        "provides": [],
+        "catalog": "monitor_catalog.py:describe"
+      },
+      "execution_contract": 1,
+      "backend": "sb3",
+      "execution_features": {
+        "input_types": [
+          "live_environment"
+        ],
+        "evaluation": "provider",
+        "resume_modes": [
+          "inference"
+        ],
+        "checkpoint_formats": [
+          "sb3.zip"
+        ],
+        "tuning": true,
+        "winner_promotion": true,
+        "episode_outcomes": true,
+        "intermediate_values": true
+      },
+      "resource_hints": {
+        "base_memory_gib": 0.55
+      },
+      "resource_hint_hook": "execution_hooks.py:resource_hints"
+    },
+    {
+      "id": "sb3/sac",
+      "kind": "algorithm",
+      "entry_point": "sb3_runner.py:execute",
+      "aliases": [],
+      "paradigms": [
+        "online_rl"
+      ],
+      "episode_outcomes": true,
+      "monitoring": {
+        "supports": [
+          "scalars.v1",
+          "system.v1"
+        ],
+        "provides": [],
+        "catalog": "monitor_catalog.py:describe"
+      },
+      "execution_contract": 1,
+      "backend": "sb3",
+      "execution_features": {
+        "input_types": [
+          "live_environment"
+        ],
+        "evaluation": "provider",
+        "resume_modes": [
+          "inference"
+        ],
+        "checkpoint_formats": [
+          "sb3.zip"
+        ],
+        "tuning": true,
+        "winner_promotion": true,
+        "episode_outcomes": true,
+        "intermediate_values": true
+      },
+      "resource_hints": {
+        "base_memory_gib": 0.55
+      },
+      "resource_hint_hook": "execution_hooks.py:resource_hints"
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "execution_hooks.py",
+      "monitor_catalog.py",
+      "sb3_monitoring.py",
+      "sb3_runner.py",
+      "theta_sb3_policy.py"
+    ],
+    "resources": [
+      "requirements.txt"
+    ],
+    "configs": {
+      "agent/sb3/a2c.yaml": "configs/agent/sb3/a2c.yaml",
+      "agent/sb3/dqn.yaml": "configs/agent/sb3/dqn.yaml",
+      "agent/sb3/ppo.yaml": "configs/agent/sb3/ppo.yaml",
+      "agent/sb3/sac.yaml": "configs/agent/sb3/sac.yaml"
+    }
+  },
+  "config_paths": [
+    "agent/sb3/a2c.yaml",
+    "agent/sb3/dqn.yaml",
+    "agent/sb3/ppo.yaml",
+    "agent/sb3/sac.yaml"
+  ],
+  "config_path": "agent/sb3/a2c.yaml",
   "parameter_schema": {
     "type": "object",
     "properties": {},
@@ -53,9 +260,6 @@
           "vf_coef": {
             "type": "number"
           },
-          "entrypoint": {
-            "type": "string"
-          },
           "learning_rate_schedule": {
             "type": "string",
             "enum": [
@@ -70,6 +274,12 @@
             "minimum": 0,
             "default": 0,
             "description": "Final rate when using a linear learning-rate schedule."
+          },
+          "backend": {
+            "type": "string",
+            "enum": [
+              "sb3"
+            ]
           }
         }
       },
@@ -111,9 +321,6 @@
           "exploration_fraction": {
             "type": "number"
           },
-          "entrypoint": {
-            "type": "string"
-          },
           "learning_rate_schedule": {
             "type": "string",
             "enum": [
@@ -128,6 +335,12 @@
             "minimum": 0,
             "default": 0,
             "description": "Final rate when using a linear learning-rate schedule."
+          },
+          "backend": {
+            "type": "string",
+            "enum": [
+              "sb3"
+            ]
           }
         }
       },
@@ -166,9 +379,6 @@
           "clip_range": {
             "type": "number"
           },
-          "entrypoint": {
-            "type": "string"
-          },
           "learning_rate_schedule": {
             "type": "string",
             "enum": [
@@ -183,6 +393,12 @@
             "minimum": 0,
             "default": 0,
             "description": "Final rate when using a linear learning-rate schedule."
+          },
+          "backend": {
+            "type": "string",
+            "enum": [
+              "sb3"
+            ]
           }
         }
       },
@@ -221,9 +437,6 @@
           "ent_coef": {
             "type": "string"
           },
-          "entrypoint": {
-            "type": "string"
-          },
           "learning_rate_schedule": {
             "type": "string",
             "enum": [
@@ -238,86 +451,15 @@
             "minimum": 0,
             "default": 0,
             "description": "Final rate when using a linear learning-rate schedule."
+          },
+          "backend": {
+            "type": "string",
+            "enum": [
+              "sb3"
+            ]
           }
         }
       }
     }
-  },
-  "config_paths": [
-    "agent/sb3/a2c.yaml",
-    "agent/sb3/dqn.yaml",
-    "agent/sb3/ppo.yaml",
-    "agent/sb3/sac.yaml"
-  ],
-  "paradigms": [
-    "online_rl"
-  ],
-  "storage_version": 3,
-  "api_version": 1,
-  "capabilities": [
-    {
-      "id": "sb3/a2c",
-      "kind": "algorithm",
-      "entry_point": "sb3_runner.py:main",
-      "aliases": [
-        "a2c"
-      ],
-      "paradigms": [
-        "online_rl"
-      ],
-      "episode_outcomes": true
-    },
-    {
-      "id": "sb3/dqn",
-      "kind": "algorithm",
-      "entry_point": "sb3_runner.py:main",
-      "aliases": [
-        "dqn"
-      ],
-      "paradigms": [
-        "online_rl"
-      ],
-      "episode_outcomes": true
-    },
-    {
-      "id": "sb3/ppo",
-      "kind": "algorithm",
-      "entry_point": "sb3_runner.py:main",
-      "aliases": [
-        "ppo"
-      ],
-      "paradigms": [
-        "online_rl"
-      ],
-      "episode_outcomes": true
-    },
-    {
-      "id": "sb3/sac",
-      "kind": "algorithm",
-      "entry_point": "sb3_runner.py:main",
-      "aliases": [
-        "sac"
-      ],
-      "paradigms": [
-        "online_rl"
-      ],
-      "episode_outcomes": true
-    }
-  ],
-  "payload": {
-    "implementations": [
-      "sb3_runner.py",
-      "theta_sb3_policy.py"
-    ],
-    "resources": [
-      "requirements.txt"
-    ],
-    "configs": {
-      "agent/sb3/a2c.yaml": "configs/agent/sb3/a2c.yaml",
-      "agent/sb3/dqn.yaml": "configs/agent/sb3/dqn.yaml",
-      "agent/sb3/ppo.yaml": "configs/agent/sb3/ppo.yaml",
-      "agent/sb3/sac.yaml": "configs/agent/sb3/sac.yaml"
-    }
-  },
-  "config_path": "agent/sb3/a2c.yaml"
+  }
 }

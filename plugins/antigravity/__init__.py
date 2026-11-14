@@ -16,8 +16,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from frontend.plugins.base import Plugin, PluginManifest
-from frontend.plugins.context import PluginContext
+from src.app.api.desktop import Plugin, PluginManifest
+from src.app.api.desktop import PluginContext
 
 import time
 
@@ -127,12 +127,7 @@ class AntigravitySettingsWidget(QWidget):
         hk_label = QLabel("Hotkey:")
         hk_label.setStyleSheet("color: #bdae93; font-size: 11px; font-weight: 600;")
 
-        window = getattr(self.context, "window", getattr(self.context, "_window", None))
-        current_sc = self.context.get_setting("hotkey", "Ctrl+Shift+Space")
-        if window is not None and hasattr(window, "settings_manager"):
-            override = window.settings_manager.get("shortcuts", "toggle_antigravity", default=None)
-            if override:
-                current_sc = override
+        current_sc = self.context.command_hotkey(AntigravityPlugin.TOGGLE_COMMAND) or "Ctrl+Shift+Space"
 
         hk_display = current_sc.replace("Ctrl+", "⌃ ").replace("Shift+", "⇧ ").replace("Alt+", "⌥ ")
         if current_sc == "Ctrl+Shift+Space":
@@ -189,6 +184,9 @@ class AntigravityPlugin(Plugin):
 
     MODE_FULL_PANEL = "full_panel"
     MODE_SIDEPANE = "sidepane"
+    DOCK_ID = "antigravity_sidepane"
+    # Command and [shortcuts] key; the host binds its hotkey and applies the user's setting.
+    TOGGLE_COMMAND = "toggle_antigravity"
 
     def __init__(self, manifest: PluginManifest):
         super().__init__(manifest)
@@ -203,6 +201,13 @@ class AntigravityPlugin(Plugin):
     def activate(self, context: PluginContext) -> None:
         self.context = context
         self.panel = AntigravityPanel(context=context)
+        context.register_command(
+            self.TOGGLE_COMMAND,
+            "Antigravity: toggle sidepane",
+            self.toggle_sidepane,
+            default_hotkey=context.get_setting("hotkey", "Ctrl+Shift+Space"),
+            keywords=("antigravity", "agent", "chat"),
+        )
 
         # Retrieve saved setting (defaults to "full_panel")
         saved_mode = context.get_setting("display_mode", self.MODE_FULL_PANEL)
@@ -215,63 +220,38 @@ class AntigravityPlugin(Plugin):
         if not self.context or not self.panel:
             return
 
-        window = getattr(self.context, "window", getattr(self.context, "_window", None))
-
         if mode == self.MODE_SIDEPANE:
             # 1. Remove from primary sidebar if present
             self.context.remove_sidebar_tab("antigravity")
 
             # 2. Attach to sidepane (QDockWidget)
-            if self.dock is None and window is not None:
-                if hasattr(self.context, "add_dock_widget"):
-                    self.dock = self.context.add_dock_widget(
-                        dock_id="antigravity_sidepane",
-                        widget=self.panel,
-                        title="Antigravity Agent",
-                        area=Qt.DockWidgetArea.RightDockWidgetArea,
-                    )
-                elif hasattr(window, "dock"):
-                    self.dock = window.dock(
-                        "Antigravity Agent",
-                        "antigravity_sidepane",
-                        self.panel,
-                        Qt.DockWidgetArea.RightDockWidgetArea,
-                    )
-                else:
-                    self.dock = QDockWidget("Antigravity Agent", window)
-                    self.dock.setObjectName("antigravity_sidepane")
-                    self.dock.setWidget(self.panel)
-                    window.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock)
-
-                self.dock.setFeatures(
-                    QDockWidget.DockWidgetFeature.DockWidgetClosable |
-                    QDockWidget.DockWidgetFeature.DockWidgetMovable
+            if self.dock is None:
+                self.dock = self.context.add_dock_widget(
+                    dock_id=self.DOCK_ID,
+                    widget=self.panel,
+                    title="Antigravity Agent",
+                    area=Qt.DockWidgetArea.RightDockWidgetArea,
                 )
-                self.dock.setMinimumWidth(320)
-                if hasattr(window, "resizeDocks"):
-                    window.resizeDocks([self.dock], [380], Qt.Orientation.Horizontal)
-                self.dock.hide()
+                if self.dock is not None:
+                    self.dock.setFeatures(
+                        QDockWidget.DockWidgetFeature.DockWidgetClosable |
+                        QDockWidget.DockWidgetFeature.DockWidgetMovable
+                    )
+                    self.dock.setMinimumWidth(320)
+                    self.dock.hide()
 
             # 3. Setup hotkey & event filter
-            self._setup_hotkey(window)
+            self._setup_hotkey()
 
         else:
             # Full Panel mode
             # 1. Teardown hotkey and filter
             self._teardown_hotkey()
 
-            # 2. Teardown dock widget if present
+            # 2. Teardown dock widget if present (the host detaches the panel for reuse)
             if self.dock is not None:
                 self.dock.hide()
-                try:
-                    self.dock.setWidget(None)
-                except Exception:
-                    pass
-                if hasattr(self.context, "remove_dock_widget"):
-                    self.context.remove_dock_widget("antigravity_sidepane")
-                elif window is not None and hasattr(window, "removeDockWidget"):
-                    window.removeDockWidget(self.dock)
-                    self.dock.deleteLater()
+                self.context.remove_dock_widget(self.DOCK_ID)
                 self.dock = None
 
             # 3. Add tab into the sidebar
@@ -283,7 +263,8 @@ class AntigravityPlugin(Plugin):
                 short_label="Agent",
             )
 
-    def _setup_hotkey(self, window: Optional[QWidget]) -> None:
+    def _setup_hotkey(self) -> None:
+        """Extra sidepane key variants; the host binds the configured hotkey for TOGGLE_COMMAND."""
         self._teardown_hotkey()
 
         app = QApplication.instance()
@@ -291,26 +272,19 @@ class AntigravityPlugin(Plugin):
             self.event_filter = SidepaneEventFilter(self.toggle_sidepane)
             app.installEventFilter(self.event_filter)
 
-        if window is not None:
-            configured_sc = self.context.get_setting("hotkey", "Ctrl+Shift+Space") if self.context else "Ctrl+Shift+Space"
-            if hasattr(window, "settings_manager"):
-                override = window.settings_manager.get("shortcuts", "toggle_antigravity", default=None)
-                if override:
-                    configured_sc = override
-
-            sequences = [
+        parent = self.context.parent_widget() if self.context else None
+        if parent is not None:
+            configured = QKeySequence(self.context.command_hotkey(self.TOGGLE_COMMAND).replace("Option", "Alt"))
+            variants = [
                 QKeySequence("Meta+Shift+Space"),  # Physical Control+Shift+Space on macOS (⌃⇧Space)
                 QKeySequence("Ctrl+Shift+Space"),  # Ctrl+Shift+Space
                 QKeySequence("Alt+Shift+Space"),   # Option+Shift+Space on macOS
             ]
-            norm = configured_sc.replace("cmd", "Ctrl").replace("command", "Ctrl").replace("Option", "Alt").replace("option", "Alt")
-            custom_seq = QKeySequence(norm)
-            if custom_seq not in sequences:
-                sequences.append(custom_seq)
-
             self.shortcuts = []
-            for seq in sequences:
-                sc = QShortcut(seq, window)
+            for seq in variants:
+                if seq == configured:
+                    continue  # bound by the host; a duplicate would make the shortcut ambiguous
+                sc = QShortcut(seq, parent)
                 sc.setContext(Qt.ShortcutContext.ApplicationShortcut)
                 sc.activated.connect(self.toggle_sidepane)
                 self.shortcuts.append(sc)
@@ -358,12 +332,8 @@ class AntigravityPlugin(Plugin):
 
         if self.dock is not None:
             self.dock.hide()
-            window = getattr(self.context, "window", getattr(self.context, "_window", None))
-            if hasattr(self.context, "remove_dock_widget"):
-                self.context.remove_dock_widget("antigravity_sidepane")
-            elif window is not None and hasattr(window, "removeDockWidget"):
-                window.removeDockWidget(self.dock)
-                self.dock.deleteLater()
+            if self.context:
+                self.context.remove_dock_widget(self.DOCK_ID)
             self.dock = None
 
         if self.context:

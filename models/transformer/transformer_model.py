@@ -11,8 +11,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.categorical import Categorical
 
-from src.app.core.model_registry import register_model
-from src.app.core.types import ActionResult
+from src.app.api.models import register_model
+from src.app.api.models import ActionResult
 
 
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):

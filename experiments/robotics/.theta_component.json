@@ -28,11 +28,6 @@
     "implementations": [],
     "resources": [],
     "configs": {
-      "env/mujoco/ant.yaml": "configs/env/mujoco/ant.yaml",
-      "env/mujoco/half_cheetah.yaml": "configs/env/mujoco/half_cheetah.yaml",
-      "env/mujoco/hopper.yaml": "configs/env/mujoco/hopper.yaml",
-      "env/mujoco/humanoid.yaml": "configs/env/mujoco/humanoid.yaml",
-      "env/mujoco/walker2d.yaml": "configs/env/mujoco/walker2d.yaml",
       "experiment/robotics/_base.yaml": "configs/experiment/robotics/_base.yaml",
       "experiment/robotics/ant_ppo.yaml": "configs/experiment/robotics/ant_ppo.yaml",
       "experiment/robotics/half_cheetah_sac.yaml": "configs/experiment/robotics/half_cheetah_sac.yaml",
@@ -42,11 +37,6 @@
     }
   },
   "config_paths": [
-    "env/mujoco/ant.yaml",
-    "env/mujoco/half_cheetah.yaml",
-    "env/mujoco/hopper.yaml",
-    "env/mujoco/humanoid.yaml",
-    "env/mujoco/walker2d.yaml",
     "experiment/robotics/_base.yaml",
     "experiment/robotics/ant_ppo.yaml",
     "experiment/robotics/half_cheetah_sac.yaml",
@@ -54,5 +44,5 @@
     "experiment/robotics/humanoid_ppo.yaml",
     "experiment/robotics/walker2d_sac.yaml"
   ],
-  "config_path": "env/mujoco/ant.yaml"
+  "config_path": "experiment/robotics/_base.yaml"
 }

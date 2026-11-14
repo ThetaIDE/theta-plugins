@@ -13,8 +13,8 @@ import torch
 import torch.nn as nn
 from torch.distributions.categorical import Categorical
 
-from src.app.core.model_registry import register_model
-from src.app.core.types import ActionResult
+from src.app.api.models import register_model
+from src.app.api.models import ActionResult
 
 
 def layer_init(layer: nn.Module, std: float = np.sqrt(2), bias_const: float = 0.0) -> nn.Module:

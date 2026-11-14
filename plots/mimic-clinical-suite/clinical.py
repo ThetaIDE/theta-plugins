@@ -20,12 +20,12 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from src.app.core.plotting.base import BasePlotter, clean_label, get_style_info
+from src.app.api.plotting import BasePlotter, clean_label, get_style_info
 
 
 class ClinicalPlotter(BasePlotter):
-    def __init__(self):
-        super().__init__("clinical")
+    def __init__(self, *, paths):
+        super().__init__("clinical", paths=paths)
 
     def run(self, exp_id: str, cli_overrides: dict | None = None):
         cfg, group, output_dir = self.get_effective_config(exp_id, cli_overrides)

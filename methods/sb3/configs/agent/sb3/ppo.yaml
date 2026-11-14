@@ -1,7 +1,7 @@
 # Stable-Baselines3 PPO (Proximal Policy Optimization)
 compatible_paradigms: [online_rl]
-algorithm: PPO
-entrypoint: package://sb3-suite/sb3_runner.py
+algorithm: sb3/ppo
+backend: sb3
 policy: MlpPolicy
 learning_rate: 3e-4
 batch_size: 64

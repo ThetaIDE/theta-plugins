@@ -11,7 +11,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from src.app.core.model_registry import register_model
+from src.app.api.models import register_model
 
 
 @register_model("autoencoder", "sequence_autoencoder", "seq_autoencoder")

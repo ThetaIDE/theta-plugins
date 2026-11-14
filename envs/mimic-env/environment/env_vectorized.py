@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import torch as th
 
-from src.app.core.env_vectorized import VectorizedBaseEnv
+from src.app.api.environments import VectorizedBaseEnv
 
 
 def compute_tqn_stage_severity(obs):
@@ -131,10 +131,13 @@ class VectorizedNudgeEnv(VectorizedBaseEnv):
         dataset_path = Path(dataset_name)
         if not dataset_path.is_file():
             filename = dataset_path.name
+            from src.app.api.workspace import WorkspacePaths
+
+            datasets = WorkspacePaths.for_process().datasets
             search_dirs = [
                 Path(os.environ.get("MIMIC_DATASET_DIR", "")),
-                Path("in/datasets/mimic"),
-                Path("in/datasets"),
+                datasets / "mimic",
+                datasets,
             ]
             dataset_path = next(
                 (directory / filename for directory in search_dirs

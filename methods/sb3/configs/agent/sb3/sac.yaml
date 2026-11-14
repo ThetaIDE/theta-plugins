@@ -1,7 +1,7 @@
 # Stable-Baselines3 SAC (Soft Actor Critic)
 compatible_paradigms: [online_rl]
-algorithm: SAC
-entrypoint: package://sb3-suite/sb3_runner.py
+algorithm: sb3/sac
+backend: sb3
 policy: MlpPolicy
 learning_rate: 3e-4
 buffer_size: 50000

@@ -6,5 +6,6 @@
   "author": "NeSyRL Team",
   "default_enabled": false,
   "icon": "obsidian",
-  "entry_point": "ObsidianPlugin"
+  "entry_point": "ObsidianPlugin",
+  "sdk": ">=2.0,<3"
 }

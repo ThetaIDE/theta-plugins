@@ -1,7 +1,7 @@
 import os
 
-from src.app.services.rulesets import resolve_ruleset
-from src.app.workspace import WorkspacePaths
+from src.app.api.rulesets import resolve_ruleset
+from src.app.api.workspace import WorkspacePaths
 
 from .facts_converter import FactsConverter
 from .nsfr import NSFReasoner

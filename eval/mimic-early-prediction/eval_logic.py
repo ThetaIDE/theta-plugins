@@ -36,8 +36,8 @@ from sklearn.model_selection import train_test_split
 # ---------------------------------------------------------------------------
 #  Method Styling — imported from plot.base
 # ---------------------------------------------------------------------------
-from src.app.core.plotting.base import clean_label
-from src.app.core.plotting.base import get_style as get_method_style
+from src.app.api.plotting import clean_label
+from src.app.api.plotting import get_style as get_method_style
 from .model import (
     SepsisLSTM,
     SepsisTransformer,
@@ -186,7 +186,7 @@ def load_policy_agent(ckpt_path, device):
     torch.serialization.add_safe_globals([getattr(sys.modules.get("omegaconf.dictconfig", None), "DictConfig", None)])
 
     try:
-        from src.app.core.agent_registry import get_agent_class
+        from src.app.api.agents import get_agent_class
         agent_cls = get_agent_class("cql")
 
         agent = agent_cls.load_from_checkpoint(str(ckpt_path), map_location=device, weights_only=False)
@@ -492,7 +492,7 @@ def plot_ep_shock_over_tau(ep_shock_results, report_dir):
         ("Non-Shock Cohort (y=0)", "non_shock", "ep_shock_over_tau_non_shock.png"),
     ]
 
-    from src.app.core.plotting.base import QUALITATIVE_PALETTE
+    from src.app.api.plotting import QUALITATIVE_PALETTE
 
     all_colors = list(QUALITATIVE_PALETTE) + [
         "tab:brown",

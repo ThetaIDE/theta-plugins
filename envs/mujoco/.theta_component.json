@@ -7,7 +7,13 @@
   "author": {
     "name": "Theta-IDE Team"
   },
-  "config_paths": [],
+  "config_paths": [
+    "env/mujoco/ant.yaml",
+    "env/mujoco/half_cheetah.yaml",
+    "env/mujoco/hopper.yaml",
+    "env/mujoco/humanoid.yaml",
+    "env/mujoco/walker2d.yaml"
+  ],
   "dependencies": {
     "pip": [
       "gymnasium[mujoco]>=1.0.0"
@@ -211,6 +217,12 @@
     "resources": [
       "requirements.txt"
     ],
-    "configs": {}
+    "configs": {
+      "env/mujoco/ant.yaml": "configs/env/mujoco/ant.yaml",
+      "env/mujoco/half_cheetah.yaml": "configs/env/mujoco/half_cheetah.yaml",
+      "env/mujoco/hopper.yaml": "configs/env/mujoco/hopper.yaml",
+      "env/mujoco/humanoid.yaml": "configs/env/mujoco/humanoid.yaml",
+      "env/mujoco/walker2d.yaml": "configs/env/mujoco/walker2d.yaml"
+    }
   }
 }

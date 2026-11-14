@@ -18,7 +18,7 @@ except ImportError:
     HAS_WEBENGINE = False
 
 if TYPE_CHECKING:
-    from frontend.plugins.context import PluginContext
+    from src.app.api.desktop import PluginContext
 
 
 HTML_PATH = Path(__file__).resolve().parent / "doom.html"

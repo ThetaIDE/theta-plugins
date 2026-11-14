@@ -1,9 +1,7 @@
-name: d3rlpy/cql
 compatible_paradigms: [offline_rl]
-entrypoint: package://d3rlpy-suite/d3rlpy_runner.py
-algorithm: CQL
+algorithm: d3rlpy/cql
+backend: d3rlpy
 learning_rate: 1e-4
 batch_size: 256
 n_steps: 50000
-cql_alpha: 1.0
 gamma: 0.99

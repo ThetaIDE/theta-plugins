@@ -18,12 +18,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from src.app.core.model_registry import register_model
-from src.app.core.protocols import (
-    DynamicTopologyProtocol,
-    ExtraStateProtocol,
-    HasModelCallbacks,
-)
+from src.app.api.models import register_model
+from src.app.api.models import DynamicTopologyProtocol, ExtraStateProtocol, HasModelCallbacks
 from .cew_utils import (
     MultiFLC,
     rule_creation,

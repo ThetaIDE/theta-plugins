@@ -55,5 +55,8 @@
     "configs": {
       "model/basics/nature_cnn.yaml": "configs/model/basics/nature_cnn.yaml"
     }
+  },
+  "exports": {
+    "NatureCNNActor": "nature_cnn_model.py:NatureCNNActor"
   }
 }

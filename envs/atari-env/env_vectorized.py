@@ -14,7 +14,7 @@ from gymnasium.wrappers import (
 import numpy as np
 import torch
 
-from src.app.core.env_vectorized import ActionCount, VectorizedBaseEnv
+from src.app.api.environments import ActionCount, VectorizedBaseEnv
 
 
 GAME_MAP = {

@@ -10,9 +10,9 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-from src.app.core.datamodule_registry import register_datamodule
-from src.app.core.interfaces import BaseDataModule
-from src.app.dataset_utils import DatasetReader
+from src.app.api.data import register_datamodule
+from src.app.api.data import BaseDataModule
+from src.app.api.data import DatasetReader
 
 log = logging.getLogger(__name__)
 

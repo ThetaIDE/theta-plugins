@@ -1,7 +1,7 @@
 # Stable-Baselines3 A2C (Advantage Actor Critic)
 compatible_paradigms: [online_rl]
-algorithm: A2C
-entrypoint: package://sb3-suite/sb3_runner.py
+algorithm: sb3/a2c
+backend: sb3
 policy: MlpPolicy
 learning_rate: 7e-4
 n_steps: 5

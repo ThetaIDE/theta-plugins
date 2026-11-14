@@ -1,7 +1,6 @@
-name: d3rlpy/td3_bc
 compatible_paradigms: [offline_rl]
-entrypoint: package://d3rlpy-suite/d3rlpy_runner.py
-algorithm: TD3_BC
+algorithm: d3rlpy/td3_bc
+backend: d3rlpy
 learning_rate: 3e-4
 batch_size: 256
 n_steps: 50000

@@ -5,7 +5,7 @@ from typing import Any
 import gymnasium as gym
 import torch
 
-from src.app.core.env_vectorized import ActionCount, VectorizedBaseEnv
+from src.app.api.environments import ActionCount, VectorizedBaseEnv
 
 ENV_IDS = {
     "ant": "Ant-v5",

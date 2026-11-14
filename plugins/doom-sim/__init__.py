@@ -4,8 +4,8 @@ from pathlib import Path
 import shutil
 from typing import Optional
 
-from frontend.plugins.base import Plugin, PluginManifest
-from frontend.plugins.context import PluginContext
+from src.app.api.desktop import Plugin, PluginManifest
+from src.app.api.desktop import PluginContext
 from .panel import DoomPanel
 
 

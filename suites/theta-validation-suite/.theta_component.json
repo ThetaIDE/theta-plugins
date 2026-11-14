@@ -57,11 +57,11 @@
       {
         "id": "sb3/ppo",
         "title": "SB3 PPO algorithm",
-        "description": "PPO must retain its runner entrypoint, algorithm identity, and online-RL capability declaration.",
+        "description": "PPO must declare its algorithm capability, execution backend and online-RL compatibility.",
         "config_path": "agent/sb3/ppo.yaml",
         "required": {
-          "entrypoint": "package://sb3-suite/sb3_runner.py",
-          "algorithm": "PPO",
+          "algorithm": "sb3/ppo",
+          "backend": "sb3",
           "compatible_paradigms": [
             "online_rl"
           ]
@@ -70,11 +70,11 @@
       {
         "id": "d3rlpy/cql",
         "title": "d3rlpy CQL algorithm",
-        "description": "CQL must retain its runner entrypoint, algorithm identity, and offline-RL capability declaration.",
+        "description": "CQL must declare its algorithm capability, execution backend and offline-RL compatibility.",
         "config_path": "agent/d3rlpy/cql.yaml",
         "required": {
-          "entrypoint": "package://d3rlpy-suite/d3rlpy_runner.py",
-          "algorithm": "CQL",
+          "algorithm": "d3rlpy/cql",
+          "backend": "d3rlpy",
           "compatible_paradigms": [
             "offline_rl"
           ]

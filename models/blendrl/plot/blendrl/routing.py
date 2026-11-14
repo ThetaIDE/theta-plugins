@@ -4,12 +4,12 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from src.app.core.plotting.base import BasePlotter
+from src.app.api.plotting import BasePlotter
 
 
 class BlendRoutingPlotter(BasePlotter):
-    def __init__(self):
-        super().__init__('blend_routing')
+    def __init__(self, *, paths):
+        super().__init__('blend_routing', paths=paths)
 
     def run(self, exp_id, cli_overrides=None):
         cfg, group, output = self.get_effective_config(exp_id, cli_overrides)
@@ -18,7 +18,7 @@ class BlendRoutingPlotter(BasePlotter):
                           for c in df.columns if str(c).startswith('blend/')})
         if metrics:
             self.plot_metric_series(exp_id, group, output, metrics, cfg)
-        root = Path('results/logs') / group / Path(exp_id).stem
+        root = self.workspace.results / 'logs' / group / Path(exp_id).stem
         sample_files = list(root.rglob('model_monitoring_samples.npz')) if root.exists() else []
         for index, path in enumerate(sorted(sample_files)):
             self.plot_samples(path, output / 'blend_routing' / f'sample_{index}', cfg)

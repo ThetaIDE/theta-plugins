@@ -6,5 +6,6 @@
   "author": "Cameron Egbert",
   "default_enabled": false,
   "icon": "doom",
-  "entry_point": "DoomPlugin"
+  "entry_point": "DoomPlugin",
+  "sdk": ">=2.0,<3"
 }

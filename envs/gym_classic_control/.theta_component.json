@@ -184,7 +184,8 @@
   ],
   "payload": {
     "implementations": [
-      "env_vectorized.py"
+      "env_vectorized.py",
+      "resources/cartpole/valuation.py"
     ],
     "resources": [
       "resources",
@@ -196,5 +197,8 @@
       "env/gym_classic_control/mountaincar.yaml": "configs/env/gym_classic_control/mountaincar.yaml",
       "env/gym_classic_control/pendulum.yaml": "configs/env/gym_classic_control/pendulum.yaml"
     }
+  },
+  "exports": {
+    "cartpole_symbolic_observation": "resources/cartpole/valuation.py:build_symbolic_observation"
   }
 }

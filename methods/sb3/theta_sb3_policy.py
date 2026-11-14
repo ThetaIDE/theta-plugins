@@ -70,7 +70,7 @@ class ModelEnvironment:
 
 
 def build_selected_model(observation_space, action_space, theta_config, theta_model, env_name, action_meanings, algorithm):
-    from src.app.core.model_registry import build_model
+    from src.app.api.models import build_model
 
     cfg = OmegaConf.create(theta_config)
     model_cfg = OmegaConf.to_container(cfg.model, resolve=True)

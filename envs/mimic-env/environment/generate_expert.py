@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, Dataset
 from sklearn.model_selection import train_test_split
 
 # Dynamic dataset directory detection
-from src.app.workspace import WorkspacePaths
+from src.app.api.workspace import WorkspacePaths
 PROJECT_ROOT = WorkspacePaths.for_process().root
 dataset_name = "mimic_lazy_0_interventions_balanced.npz"
 search_dirs = [

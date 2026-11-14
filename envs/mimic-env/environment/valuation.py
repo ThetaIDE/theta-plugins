@@ -1,7 +1,10 @@
 import os
 import torch as th
-from src.app.core.provider_loader import provider_object
-bool_to_probs = provider_object('nsfr', 'utils/common.py:bool_to_probs')
+
+
+def bool_to_probs(x):
+    """Soften Boolean predicates to probabilities (1 -> 0.99, 0 -> 0.01)."""
+    return th.where(x, 0.99, 0.01)
 
 
 VALUATION_MODE = "rigid"

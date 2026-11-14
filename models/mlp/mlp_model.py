@@ -5,8 +5,8 @@ import torch
 import torch.nn as nn
 from torch.distributions.categorical import Categorical
 
-from src.app.core.model_registry import register_model
-from src.app.core.types import ActionResult
+from src.app.api.models import register_model
+from src.app.api.models import ActionResult
 
 
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
@@ -15,8 +15,8 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     return layer
 
 
-from src.app.core.provider_loader import provider_object
-NatureCNNActor = provider_object('nature_cnn', 'nature_cnn_model.py:NatureCNNActor')
+from src.app.api.packages import provider_export
+NatureCNNActor = provider_export('nature_cnn', 'NatureCNNActor')
 
 # Backward compatibility alias
 NeuralBlenderActor = NatureCNNActor
@@ -275,7 +275,7 @@ name suggests otherwise. These are plain classifiers: features in, logits out.
 import torch
 import torch.nn as nn
 
-from src.app.core.model_registry import register_model
+from src.app.api.models import register_model
 
 
 @register_model("mlp_classifier", "tabular_classifier", "classifier")

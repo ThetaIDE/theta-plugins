@@ -21,8 +21,8 @@ from pathlib import Path
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from src.app.workspace import WorkspacePaths
-from src.app import telemetry
+from src.app.api import telemetry
+from src.app.api.workspace import WorkspacePaths
 
 
 def resolve_algorithm(name, algorithms):
@@ -77,6 +77,47 @@ def linear_learning_rate(spec):
     return lambda progress: final + (initial - final) * max(0.0, min(1.0, progress))
 
 
+def evaluate_policy_modes(model, env, *, episodes, seed, callback=None):
+    """Evaluate both action rules on matched resets without consuming training RNG."""
+    import copy
+    from stable_baselines3.common.evaluation import evaluate_policy
+    from stable_baselines3.common.utils import set_random_seed
+    from src.app.api.monitoring import preserve_rng
+
+    modes = [(module, module.training) for module in model.policy.modules()]
+    action_space = model.action_space
+    results = {}
+    try:
+        with preserve_rng():
+            # DQN samples exploration actions from the space's own generator,
+            # which is separate from Python, NumPy and torch's global state.
+            model.action_space = copy.deepcopy(action_space)
+            for mode, deterministic in (("greedy", True), ("sampled", False)):
+                set_random_seed(seed, using_cuda=model.device.type == "cuda")
+                model.action_space.seed(seed)
+                env.seed(seed)
+                started = time.monotonic()
+                heartbeat = [started, 0]
+                def progress(local_vars, global_vars):
+                    heartbeat[1] += 1
+                    now = time.monotonic()
+                    if now - heartbeat[0] >= 30:
+                        print(f"[Evaluation] {mode}: {heartbeat[1]} environment steps in {now - started:.1f}s", flush=True)
+                        heartbeat[0] = now
+                    if deterministic and callback is not None:
+                        callback(local_vars, global_vars)
+                rewards, _ = evaluate_policy(
+                    model, env, n_eval_episodes=episodes, deterministic=deterministic,
+                    return_episode_rewards=True, callback=progress,
+                )
+                results[mode] = [float(value) for value in rewards]
+    finally:
+        model.action_space = action_space
+        for module, training in modes:
+            module.training = training
+    return results
+
+
 class EpisodeMetrics:
     """Collect every completed training episode, including between logger dumps."""
 
@@ -125,16 +166,21 @@ class ThetaSB3Writer:
         pass
 
 
-@hydra.main(version_base=None, config_path=str(WorkspacePaths.for_process().primary_config), config_name="config")
-def main(cfg: DictConfig):
+def execute(cfg: DictConfig, context):
+    from src.app.api.execution import RunResult
+    if cfg.get("resume") or cfg.get("recover") or context.checkpoint:
+        raise ValueError("sb3-suite supports inference reload of native .zip checkpoints; exact training resume is unsupported")
+    context.check_cancelled()
     if os.environ.get('THETA_MANAGED_THREADS'):
         import torch
         torch.set_num_threads(int(os.environ['THETA_MANAGED_THREADS']))
+    import torch
+    print(f"[Runtime] torch_threads={torch.get_num_threads()}, interop_threads={torch.get_num_interop_threads()}", flush=True)
     model_cfg = cfg.get("model", {})
-    from src.app.pipeline.tuners import trial_monitor
+    from src.app.api.tuning import trial_monitor
     monitor = trial_monitor(cfg)
     if monitor is not None:
-        from src.app.pipeline.objective import objective_metric
+        from src.app.api.tuning import objective_metric
         if objective_metric(cfg, "eval/reward") != "eval/reward":
             raise ValueError("SB3 pruning requires the eval/reward objective.")
     try:
@@ -144,17 +190,17 @@ def main(cfg: DictConfig):
         from stable_baselines3.common.logger import KVWriter
     except ImportError:
         print(
-            "\n[Error] Stable-Baselines3 is not installed in the active environment.\n"
-            "Please run: pip install stable-baselines3 shimmy\n"
-            "or install the SB3 plugin via the Theta Hub.\n"
+            "\n[Error] Stable-Baselines3 could not be imported. "
+            "The traceback below identifies the missing or broken dependency.\n",
+            file=sys.stderr,
         )
-        sys.exit(1)
+        raise
 
     try:
         import gymnasium as gym
     except ImportError:
-        print("\n[Error] Gymnasium is required for SB3. Run: pip install gymnasium\n")
-        sys.exit(1)
+        print("\n[Error] Gymnasium could not be imported; see the dependency traceback below.\n", file=sys.stderr)
+        raise
 
     group = str(cfg.get("group", "default_group"))
     exp_id = str(cfg.get("experiment_id", "default_exp"))
@@ -178,7 +224,7 @@ def main(cfg: DictConfig):
 
     # Telemetry: metrics.csv and the live feed by default; ++telemetry.sinks=[...] picks others
     sinks, system_interval = telemetry.settings_from_config(cfg)
-    from src.app.pipeline.trial_artifacts import trial_log_version
+    from src.app.api.tuning import trial_log_version
     logger = telemetry.init(
         group,
         exp_id,
@@ -189,6 +235,9 @@ def main(cfg: DictConfig):
         version=cfg.get("variability_version") if cfg.get("variability_run_id") else trial_log_version(cfg),
     )
 
+    cleanup_logger = lambda: logger.finish(status="failed")
+    context.on_cleanup(cleanup_logger)
+
     from hydra.core.hydra_config import HydraConfig
 
     hydra_cfg = HydraConfig.get()
@@ -197,11 +246,12 @@ def main(cfg: DictConfig):
     if cfg.get("variability_run_id"):
         ckpt_dir = ckpt_dir / str(cfg.get("variability_version", "version_0"))
     if is_sweep:
-        from src.app.pipeline.trial_artifacts import trial_checkpoint_dir_from_config
+        from src.app.api.tuning import trial_checkpoint_dir_from_config
 
         ckpt_dir = trial_checkpoint_dir_from_config(ckpt_dir, cfg) or (
             ckpt_dir / "sweeps" / str(hydra_cfg.sweeper.study_name) / f"trial_{hydra_cfg.job.num}"
         )
+    ckpt_dir = context.artifacts
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
     # Custom SB3 Callback to bridge telemetry into the Theta-IDE telemetry run
@@ -227,6 +277,10 @@ def main(cfg: DictConfig):
             collect = getattr(selected, "collect_monitoring", None)
             namespace = getattr(selected, "monitoring_namespace", None)
             if not callable(collect) or (namespace and not self.run.metrics.keeps_section(namespace)):
+                return
+            # Model observation diagnostics are optional collection work. Normal
+            # training/evaluation metrics still reach saved results when hidden.
+            if namespace and not self.run.wants_monitor(f"{namespace}/{phase}/"):
                 return
             obs = torch.as_tensor(observations, device=self.model.device)
             metrics, samples = collect(obs)
@@ -260,7 +314,15 @@ def main(cfg: DictConfig):
             self.run.artifact(path, kind="model_monitoring_samples")
 
         def _evaluate(self):
-            from stable_baselines3.common.evaluation import evaluate_policy
+            from src.app.api.monitoring import preserve_rng
+            # Environment construction and optional observation diagnostics must
+            # also leave the training random sequence untouched.
+            with preserve_rng(), self.run.phase("testing", "Testing greedy and sampled policies",
+                                episodes=2 * max(1, int(cfg.get("eval_episodes") or 5)),
+                                transitions=int(self.num_timesteps)):
+                self._evaluate_policy()
+
+        def _evaluate_policy(self):
             from stable_baselines3.common.vec_env import DummyVecEnv
             import json
             import numpy as np
@@ -268,9 +330,11 @@ def main(cfg: DictConfig):
             if self.eval_env is None:
                 self.eval_env = DummyVecEnv([make_environment])
             base = cfg.get("variability_evaluation_seed")
-            seed = ((int(base) + self.eval_index) % (2**32 - 1)) if base is not None else None
-            if seed is not None:
-                self.eval_env.seed(seed)
+            if base is None:
+                base = (cfg.get("variability") or {}).get("evaluation_seed")
+            if base is None:
+                base = 10000000
+            seed = (int(base) + self.eval_index) % (2**32 - 1)
             eval_observations = []
             sample_rng = np.random.default_rng(seed)
             observation_count = 0
@@ -284,30 +348,40 @@ def main(cfg: DictConfig):
                     index = int(sample_rng.integers(observation_count))
                     if index < len(eval_observations):
                         eval_observations[index] = observation
-            rewards, _ = evaluate_policy(self.model, self.eval_env, n_eval_episodes=max(1, int(cfg.get("eval_episodes") or 5)),
-                                         deterministic=True, return_episode_rewards=True, callback=capture_eval)
+            started = time.monotonic()
+            print(f"[Evaluation] step={self.num_timesteps}: {max(1, int(cfg.get('eval_episodes') or 5))} episodes per mode (greedy + sampled).", flush=True)
+            results = evaluate_policy_modes(self.model, self.eval_env,
+                episodes=max(1, int(cfg.get("eval_episodes") or 5)), seed=seed, callback=capture_eval)
+            print(f"[Evaluation] step={self.num_timesteps}: completed in {time.monotonic() - started:.2f}s; "
+                  + ", ".join(f"{mode}={np.mean(rewards):.1f}" for mode, rewards in results.items()), flush=True)
             if eval_observations:
                 self._model_monitor(np.stack(eval_observations), "eval")
             step = int(self.num_timesteps)
-            self.run.log({"eval/reward": float(np.mean(rewards)), "eval/reward_std": float(np.std(rewards))},
-                         step=step, transitions=step)
-            reward = float(np.mean(rewards))
+            metrics = {}
+            for mode, rewards in results.items():
+                metrics[f"eval/{mode}_reward"] = float(np.mean(rewards))
+                metrics[f"eval/{mode}_reward_std"] = float(np.std(rewards))
+            # The primary objective and best-checkpoint rule remain greedy.
+            reward = metrics["eval/greedy_reward"]
+            metrics.update({"eval/reward": reward, "eval/reward_std": metrics["eval/greedy_reward_std"]})
+            self.run.log(metrics, step=step, transitions=step)
             self.last_eval_reward = reward
-            if cfg.get("variability_run_id"):
-                event = {"schema_version": 1, "run_id": str(cfg.variability_run_id),
-                     "method": str(cfg.variability_method), "event_index": self.eval_index,
-                     "training_step": step, "checkpoint": "in-memory policy", "metric": "eval/reward",
-                     "episode_count": len(rewards), "evaluation_seed": seed,
-                     "seed_policy": "(base plus event index) modulo (2^32 minus 1)" if seed is not None else "runner default",
-                     "deterministic_actions": True, "episode_outcomes": [float(x) for x in rewards]}
-                path = (Path("results/logs") / group / exp_id / agent_name.replace("/", "_")
-                    / str(cfg.get("variability_version", "version_0")) / "evaluation_events.jsonl")
-                path.parent.mkdir(parents=True, exist_ok=True)
-                with path.open("a", encoding="utf-8") as stream:
+            path = self.run.version_dir / "evaluation_events.jsonl"
+            with path.open("a", encoding="utf-8") as stream:
+                for mode, rewards in results.items():
+                    event = {"schema_version": 1,
+                         "run_id": str(cfg.get("variability_run_id") or f"{group}/{exp_id}/{agent_name}/{self.run.version_dir.name}"),
+                         "method": str(cfg.get("variability_method") or agent_name), "event_index": self.eval_index,
+                         "training_step": step, "checkpoint": "in-memory policy",
+                         "metric": "eval/reward" if mode == "greedy" else "eval/sampled_reward",
+                         "evaluation_mode": mode, "episode_count": len(rewards), "evaluation_seed": seed,
+                         "action_seed": seed,
+                         "seed_policy": "(base plus event index) modulo (2^32 minus 1); shared across modes",
+                         "deterministic_actions": mode == "greedy", "episode_outcomes": rewards}
                     stream.write(json.dumps(event, allow_nan=False) + "\n")
             if monitor is not None:
-                from src.app.pipeline.objective import objective_value
-                value = objective_value({"eval/reward": float(np.mean(rewards))}, "eval/reward")
+                from src.app.api.tuning import objective_value
+                value = objective_value({"eval/reward": reward}, "eval/reward")
                 monitor.report(value, self.eval_index)
             if reward > self.best_eval_reward:
                 # Publish a best checkpoint only after successful completion.
@@ -317,16 +391,18 @@ def main(cfg: DictConfig):
             self.last_eval = step
 
         def _evaluation_enabled(self):
-            from src.app.telemetry.selection import selection_from_config
-            return bool(cfg.get("variability_run_id") and int(cfg.get("eval_episodes", 0) or 0) > 0
+            from src.app.api.telemetry import selection_from_config
+            return bool(int(cfg.get("eval_episodes", 0) or 0) > 0
                         and selection_from_config(cfg).keeps_section("eval"))
 
         def _on_training_start(self) -> None:
             self.model.logger.output_formats.append(SB3TelemetryWriter(self.run, self))
             if self._evaluation_enabled():
                 self._evaluate()
+            self.run.set_stage("training", "Training started")
 
         def _on_step(self) -> bool:
+            context.check_cancelled()
             self.episodes.record(self.locals.get("infos", []), self.num_timesteps)
             interval = int(model_cfg.get("monitoring_interval", 256) or 0)
             observations = self.locals.get("new_obs")
@@ -390,13 +466,15 @@ def main(cfg: DictConfig):
     else:
         env = make_environment()
 
+    context.on_cleanup(env.close)
+
     # Resolve algorithm class
     algo_map = {"PPO": PPO, "DQN": DQN, "A2C": A2C, "SAC": SAC}
     AlgoClass = resolve_algorithm(algo_name, algo_map)
 
     # Hyperparameters
     algo_kwargs = algorithm_options(agent_cfg, AlgoClass)
-    seed = cfg.get("seed", agent_cfg.get("seed"))
+    seed = context.seed
     if seed is not None:
         algo_kwargs["seed"] = int(seed)
     selected_model = (model_cfg.get("architecture") or model_cfg.get("name") or model_cfg.get("type")) if hasattr(model_cfg, "get") else None
@@ -438,7 +516,11 @@ def main(cfg: DictConfig):
         return f"{type(obj).__module__}.{type(obj).__qualname__}"
     model_identity = {"algorithm_class": class_name(model), "policy_class": class_name(model.policy),
                       "model_class": class_name(active_model) if active_model is not None else None,
-                      "training_envs": model.n_envs}
+                      "training_envs": model.n_envs,
+                      "evaluation_protocol": {"modes": ["greedy", "sampled"],
+                          "primary_metric": "eval/reward", "primary_mode": "greedy",
+                          "episodes_per_mode": max(1, int(cfg.get("eval_episodes") or 5)),
+                          "matched_environment_seeds": True, "preserves_training_rng": True}}
     if active_model is not None and hasattr(active_model, "policy_modules"):
         model_identity["model_components"] = [class_name(part) for part in active_model.policy_modules]
     logger.event("model", "Training model constructed", **model_identity)
@@ -451,26 +533,21 @@ def main(cfg: DictConfig):
     start_time = time.time()
     status = "failed"
     objective = None
-    logger.event("stage", "Training started", stage="training")
+    logger.set_stage("starting", "Preparing diagnostics")
     try:
-        model.learn(total_timesteps=total_timesteps, callback=cb)
+        from src.app.api.monitoring import MonitorManager
+        from .sb3_monitoring import monitored_learn
+        monitor_manager = MonitorManager(cfg, logger, active_model, algo_name, make_environment)
+        monitored_learn(model, monitor_manager, total_timesteps=total_timesteps, callback=cb)
         if is_sweep:
-            from src.app.pipeline.objective import objective_metric, objective_value
+            from src.app.api.tuning import objective_metric, objective_value
 
             metric = objective_metric(cfg, "eval/reward")
             if metric != "eval/reward":
                 raise ValueError(f"SB3 sweep objective {metric!r} is not supported; use 'eval/reward'.")
-            from stable_baselines3.common.evaluation import evaluate_policy
-            from stable_baselines3.common.vec_env import DummyVecEnv
-
-            if cb.last_eval == cb.num_timesteps and cb.last_eval_reward is not None:
-                objective = cb.last_eval_reward
-            else:
-                evaluation_env = DummyVecEnv([make_environment])
-                try:
-                    objective, _ = evaluate_policy(model, evaluation_env, n_eval_episodes=max(1, int(cfg.get("eval_episodes") or 5)), deterministic=True)
-                finally:
-                    evaluation_env.close()
+            if cb.last_eval != cb.num_timesteps or cb.last_eval_reward is None:
+                cb._evaluate()
+            objective = cb.last_eval_reward
             objective = objective_value({metric: objective}, metric)
             logger.log({metric: objective}, step=cb.n_calls, transitions=cb.num_timesteps)
         status = "completed"
@@ -479,6 +556,9 @@ def main(cfg: DictConfig):
             status = "pruned"
             logger.event("stage", str(exc), stage="pruned")
         else:
+            from src.app.api.execution import TrainingCancelled
+            if isinstance(exc, (TrainingCancelled, KeyboardInterrupt)):
+                status = "cancelled"
             logger.event("error", f"{type(exc).__name__}: {exc}", level="error")
             raise
     finally:
@@ -498,6 +578,7 @@ def main(cfg: DictConfig):
         for name in checkpoint_names:
             logger.artifact(ckpt_dir / name, kind="checkpoint")
         logger.finish(status=status)
+        context.remove_cleanup(cleanup_logger)
         if cb.eval_env is not None:
             cb.eval_env.close()
         env.close()
@@ -505,16 +586,8 @@ def main(cfg: DictConfig):
     print(f"\n[SB3 Engine Complete] Total time: {end_time - start_time:.2f}s")
     print(f"Checkpoints saved to: {ckpt_dir}")
     print(f"Telemetry logged to: {logger.version_dir}")
-    return {"theta_trial_status": "pruned"} if status == "pruned" else objective
-
-
-def launch():
-    paths = WorkspacePaths.for_process()
-    search = [f"file://{p}" for p in paths.config_roots() if p.is_dir() and p != paths.primary_config]
-    if not any(arg.lstrip('+').startswith('hydra.searchpath=') for arg in sys.argv[1:]):
-        sys.argv.append('hydra.searchpath=[' + ','.join(search) + ']')
-    main()
-
-
-if __name__ == "__main__":
-    launch()
+    return RunResult(status=status, objective=objective,
+                     metrics={"eval/reward": cb.last_eval_reward} if cb.last_eval_reward is not None else {},
+                     metric_definitions={"eval/reward": {"direction": "maximize", "meaning": "Mean greedy episodic return"}},
+                     artifacts=[{"path": str(ckpt_dir / name), "kind": "checkpoint", "format": "sb3.zip"} for name in checkpoint_names],
+                     progress={"unit": "transitions", "completed": cb.num_timesteps})

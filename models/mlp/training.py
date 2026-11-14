@@ -2,7 +2,7 @@
 import lightning as L
 import torch
 import torch.nn.functional as F
-from src.app.core.model_registry import build_model
+from src.app.api.models import build_model
 
 
 class MLPClassifierLightningModule(L.LightningModule):

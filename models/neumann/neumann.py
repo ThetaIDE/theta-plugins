@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch_geometric.data import Batch, Data
 
-from src.app.core.model_registry import register_model
+from src.app.api.models import register_model
 from .logic_utils import add_true_atoms, get_index_by_predname, true
 from .torch_utils import softor
 

@@ -78,5 +78,16 @@
     "configs": {
       "eval/mimic/early_prediction.yaml": "configs/eval/mimic/early_prediction.yaml"
     }
+  },
+  "exports": {
+    "SepsisLSTM": "model.py:SepsisLSTM",
+    "SepsisTransformer": "model.py:SepsisTransformer",
+    "compute_ep_eval_data": "eval_logic.py:compute_ep_eval_data",
+    "compute_volatility_features": "model.py:compute_volatility_features",
+    "evaluate_lstm_model": "model.py:evaluate_lstm_model",
+    "evaluate_transformer_model": "model.py:evaluate_transformer_model",
+    "plot_agreement_vs_shock": "eval_logic.py:plot_agreement_vs_shock",
+    "plot_ep_shock_over_tau": "eval_logic.py:plot_ep_shock_over_tau",
+    "write_counterfactual_table": "eval_logic.py:write_counterfactual_table"
   }
 }

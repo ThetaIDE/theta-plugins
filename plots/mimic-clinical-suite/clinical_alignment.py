@@ -30,15 +30,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.metrics import average_precision_score, precision_recall_curve, roc_auc_score
 
-from src.app.core.plotting.base import (
-    BasePlotter,
-    clean_label,
-    get_canonical_method_name,
-    get_method_aliases,
-)
-from src.app.core.plotting.base import (
-    get_style as get_method_style,
-)
+from src.app.api.plotting import BasePlotter, clean_label, get_canonical_method_name, get_method_aliases
+from src.app.api.plotting import get_style as get_method_style
 
 
 def compute_trajectory_agreement(
@@ -87,8 +80,8 @@ def compute_trajectory_agreement(
 
 
 class ClinicalAlignmentPlotter(BasePlotter):
-    def __init__(self):
-        super().__init__("clinical_alignment")
+    def __init__(self, *, paths):
+        super().__init__("clinical_alignment", paths=paths)
 
     def run(self, exp_id: str, cli_overrides: dict | None = None):
         cfg, group, output_dir = self.get_effective_config(exp_id, cli_overrides)
@@ -96,9 +89,10 @@ class ClinicalAlignmentPlotter(BasePlotter):
         self._run_mimic_eval(exp_id, cfg, group, clean_exp, output_dir)
 
     def _discover_checkpoints(self, exp_id: str, group: str, clean_exp: str):
-        ckpt_root = Path("results/checkpoints") / group / clean_exp
+        checkpoints = self.workspace.results / "checkpoints"
+        ckpt_root = checkpoints / group / clean_exp
         if not ckpt_root.exists():
-            ckpt_root = Path("results/checkpoints") / clean_exp
+            ckpt_root = checkpoints / clean_exp
         if not ckpt_root.exists():
             return {}, {}
 
@@ -117,17 +111,11 @@ class ClinicalAlignmentPlotter(BasePlotter):
 
                 canon = get_canonical_method_name(m_name)
 
-                # 1. Best checkpoint
+                # 1. Best checkpoint: the tuner's promoted winner, else any saved best model.
                 best_ckpt = None
-                storage_url = exp_cfg.get("hydra", {}).get("sweeper", {}).get("storage", None)
-                if storage_url:
-                    from src.app.pipeline.optuna_utils import get_best_trial_id
-
-                    study_name = f"{clean_exp}_{m_name}"
-                    best_id = get_best_trial_id(storage_url, study_name)
-                    candidate = method_dir / best_id / "best_model.ckpt"
-                    if candidate.exists():
-                        best_ckpt = candidate
+                promoted = method_dir / "best_model.ckpt"
+                if promoted.is_file():
+                    best_ckpt = promoted
 
                 if not best_ckpt:
                     ckpts = list(method_dir.rglob("best_model*.ckpt"))
@@ -162,20 +150,17 @@ class ClinicalAlignmentPlotter(BasePlotter):
         return method_ckpts, method_interval_ckpts
 
     def _load_agent(self, path, dev):
-        from src.app.core.agent_registry import AGENT_REGISTRY, auto_discover, get_agent_class
+        from src.app.api.agents import get_agent_class, list_registered_agents
 
-        auto_discover()
         candidates = []
-        for name in ("cql", "iql", "blendrl_cql", "blendrl_iql", "cew"):
+        preferred = ("cql", "iql", "blendrl_cql", "blendrl_iql", "cew")
+        for name in (*preferred, *[n for n in list_registered_agents() if n not in preferred]):
             try:
                 cand = get_agent_class(name)
-                if cand not in candidates:
-                    candidates.append(cand)
             except Exception:
-                pass
-        for cls in AGENT_REGISTRY.values():
-            if cls not in candidates and hasattr(cls, "load_from_checkpoint"):
-                candidates.append(cls)
+                continue
+            if cand not in candidates and hasattr(cand, "load_from_checkpoint"):
+                candidates.append(cand)
 
         last_error = None
         for cls in candidates:
@@ -270,7 +255,7 @@ class ClinicalAlignmentPlotter(BasePlotter):
             if isinstance(cfg.get("env"), dict)
             else "mimic_lazy_0_interventions_balanced.npz"
         )
-        npz_candidate = Path("in/datasets/mimic") / env_ds
+        npz_candidate = self.workspace.datasets / "mimic" / env_ds
         if not npz_candidate.exists():
             mode_path = cfg.get("mode", {}).get("dataset_path", "")
             if mode_path:

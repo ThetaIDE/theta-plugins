@@ -3,13 +3,14 @@ import pickle
 from pathlib import Path
 
 
-def get_ep_eval_data(exp_id, cfg, group, output_dir):
+def get_ep_eval_data(exp_id, cfg, group, output_dir, *, paths):
     cache_path = Path(output_dir) / "ep_eval_cache.pkl"
     remake = cfg.get("remake", False)
 
-    ckpt_dir = Path("results/checkpoints") / group / exp_id
+    checkpoints = paths.results / "checkpoints"
+    ckpt_dir = checkpoints / group / exp_id
     if not ckpt_dir.exists():
-        matches = list(Path("results/checkpoints").glob(f"**/{exp_id}"))
+        matches = list(checkpoints.glob(f"**/{exp_id}"))
         if matches:
             ckpt_dir = matches[0]
 
@@ -26,8 +27,8 @@ def get_ep_eval_data(exp_id, cfg, group, output_dir):
         with open(cache_path, "rb") as f:
             return pickle.load(f)
 
-    from src.app.core.provider_loader import provider_object
-    compute_ep_eval_data = provider_object('mimic-early-prediction', 'eval_logic.py:compute_ep_eval_data')
+    from src.app.api.packages import provider_export
+    compute_ep_eval_data = provider_export('mimic-early-prediction', 'compute_ep_eval_data')
 
     if not ckpt_dir.exists():
         print(f"Error: Could not find checkpoint directory for {exp_id}")

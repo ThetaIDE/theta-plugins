@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from src.app.core.model_registry import register_model
+from src.app.api.models import register_model
 from .utils.logic import get_index_by_predname
 
 

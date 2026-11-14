@@ -20,7 +20,7 @@ from src.app.components.installer import HubInstaller
 from src.app.components.lifecycle import dependencies
 from src.app.components.models import HubComponent, ReleaseInfo
 from src.app.core.provider_catalog import ProviderCatalog, content_hash, file_hash
-from src.app.core.provider_loader import load_capability, resolve_provider, provider_object
+from src.app.core.provider_loader import load_capability, load_module, provider_export, resolve_provider
 from src.app.workspace import WorkspacePaths
 
 IDS = [json.loads(p.read_text())['id'] for p in sorted(ROOT.glob('*/*/.theta_component.json'))]
@@ -89,9 +89,9 @@ sys.meta_path.insert(0, Absent())
 from src.app.core.provider_catalog import ProviderCatalog
 c=ProviderCatalog()
 assert not c.diagnostics, c.diagnostics
-assert len([p for p in c.packages if p.managed]) == 37
+assert len([p for p in c.packages if p.managed]) == %d
 assert not any(type(f).__name__ == '_LegacyFinder' for f in sys.meta_path)
-'''])
+''' % len(IDS)])
 
 
 def test_framework_paradigms_remain_without_algorithm_plugins(native, tmp_path):
@@ -128,15 +128,21 @@ def test_environment_rules_helpers_and_models_use_package_resources(native):
             model=build_model(name,obs_dim=4,n_actions=2,device='cpu')
             assert isinstance(model,torch.nn.Module)
     finally:env.close()
-    make=provider_object('nsfr','common.py:get_nsfr_model',native.paths)
+    catalog=ProviderCatalog(native.paths)
+    make=provider_export('nsfr','get_nsfr_model',paths=native.paths)
     reasoner=make('cartpole','anticipatory_v1','cpu',train=True)
-    observation=provider_object('nsfr','resources/rules/cartpole/anticipatory_v1/valuation.py:build_symbolic_observation',native.paths)
+    observation=load_module(catalog.package('nsfr'),'resources/rules/cartpole/anticipatory_v1/valuation.py',
+                            paths=native.paths).build_symbolic_observation
     values=reasoner(observation(torch.zeros(2,4)))
     assert values.shape[0]==2 and torch.isfinite(values).all()
-    reasoner=provider_object('neumann','common.py:get_neumann_model',native.paths)('cartpole','anticipatory_v1','cpu',train=True)
+    reasoner=provider_export('neumann','get_neumann_model',paths=native.paths)('cartpole','anticipatory_v1','cpu',train=True)
     values=reasoner(observation(torch.zeros(2,4)))
     assert values.shape==(2,2) and torch.isfinite(values).all()
-    multiply=provider_object('neumann','scatter.py:scatter_mul',native.paths)
+    # The CartPole profile names its symbolic builder as a declared export.
+    from src.app.core.provider_loader import configured_export
+    builder=configured_export('export://gym_classic_control/cartpole_symbolic_observation',paths=native.paths)
+    assert builder(torch.zeros(3,4)).shape==(3,2,4)
+    multiply=load_module(catalog.package('neumann'),'scatter.py',paths=native.paths).scatter_mul
     x=torch.tensor([2.,3.,5.,7.],requires_grad=True)
     result=multiply(x,torch.tensor([0,1,0,1]),dim=0,dim_size=2)
     assert torch.equal(result,torch.tensor([10.,21.]))
@@ -165,8 +171,8 @@ def test_editable_copy_edit_export_install_update_failure_uninstall(native, tmp_
     cls=resolve_provider('model','native_editable_dnn',other.paths)
     assert sys.modules[cls.__module__].NATIVE_EDIT_MARKER==17
     installed=ProviderCatalog(other.paths).package(c.id);original=content_hash(installed.root)
-    # Package/config/record rollback must preserve a working installed native archive.
-    for boundary in ('config','package','record'):
+    # Package/record rollback must preserve a working installed native archive (installs write no config).
+    for boundary in ('package','record'):
         def fail(current,identity):
             if current==boundary:raise RuntimeError('injected native lifecycle failure')
         other._failure_point=fail
@@ -180,16 +186,21 @@ def test_editable_copy_edit_export_install_update_failure_uninstall(native, tmp_
 
 @pytest.mark.parametrize('model', ['basics/dnn','blendrl'])
 def test_real_sb3_worker_training_and_fresh_checkpoint(native, model):
-    overrides=['agent=sb3/ppo','env=gym_classic_control/cartpole','model='+model,
-               'total_timesteps=64','agent.n_steps=32','agent.batch_size=32','agent.n_epochs=1',
-               'env.num_envs=1','group=native','experiment_id='+model.replace('/','_')]
+    experiment=model.replace('/','_')
+    overrides=['paradigm=online_rl','agent=sb3/ppo','++agent.name=sb3_agent','env=gym_classic_control/cartpole',
+               'model='+model,'total_timesteps=64','agent.n_steps=32','agent.batch_size=32','agent.n_epochs=1',
+               'env.num_envs=1','group=native','experiment_id='+experiment]
     if model=='blendrl':overrides+=['model.symbolic.rules=anticipatory_v1']
-    result=execute(native,['-m','src.app.pipeline.provider_worker','package://sb3-suite/sb3_runner.py',*overrides])
+    result=execute(native,['-m','src.app.pipeline.provider_worker','src/app/train.py',*overrides])
     assert '[SB3 Engine Complete]' in result.stdout
-    checkpoint=native.paths.results/'checkpoints/native'/model.replace('/','_')/'sb3_agent/latest_model.zip'
-    assert checkpoint.is_file(),list(checkpoint.parent.glob('*'))
-    code=f'''from src.app.core.provider_loader import provider_object
-ThetaPPO=provider_object('sb3-suite','theta_sb3_policy.py:ThetaPPO')
+    run=native.paths.results/'checkpoints/native'/experiment/'sb3_agent'
+    record=json.loads(next(run.glob('*/execution.json')).read_text())
+    assert record['status']=='completed' and record['metadata']['algorithm']['id']=='sb3/ppo'
+    assert record['metadata']['backend']=='sb3'
+    checkpoint=next(run.glob('*/latest_model.zip'))
+    code=f'''from src.app.core.provider_catalog import get_catalog
+from src.app.core.provider_loader import load_module
+ThetaPPO=load_module(get_catalog().package('sb3-suite'),'theta_sb3_policy.py').ThetaPPO
 model=ThetaPPO.load({str(checkpoint)!r},device='cpu')
 assert model.policy.theta_model_module is not None
 '''
@@ -240,17 +251,16 @@ def test_desktop_app_plugins_preserve_identity_settings_and_lease(native):
 
 def test_workspace_override_and_packaged_default_precedence(native):
     paths=native.paths
-    active=paths.config/'model/basics/dnn.yaml'
-    original=active.read_bytes()
+    packaged=paths.installed_components/'dnn/configs/model/basics/dnn.yaml'
+    assert paths.resolve_config('model/basics/dnn.yaml')==packaged and packaged.is_file()
+    override=paths.config/'model/basics/dnn.yaml'
+    override.parent.mkdir(parents=True,exist_ok=True)
     try:
-        active.chmod(0o644);active.write_text('architecture: dnn\nhidden_sizes: [7, 7]\n')
-        assert paths.resolve_config('model/basics/dnn.yaml')==active
-        active.unlink()
-        packaged=paths.resolve_config('model/basics/dnn.yaml')
-        assert packaged==paths.installed_components/'dnn/configs/model/basics/dnn.yaml'
-        assert packaged.is_file()
+        override.write_text('architecture: dnn\nhidden_sizes: [7, 7]\n')
+        assert paths.resolve_config('model/basics/dnn.yaml')==override
     finally:
-        active.write_bytes(original)
+        override.unlink()
+    assert paths.resolve_config('model/basics/dnn.yaml')==packaged
 
 
 @pytest.mark.parametrize('paradigm,model', [('supervised','basics/mlp_classifier'),('unsupervised','basics/dense_autoencoder')])
@@ -278,11 +288,13 @@ def test_real_offline_runner_uses_explicit_transition_dataset(native):
         obs=rng.normal(size=4).astype('float32')
         writer.add(obs,step%2,1.0,obs+0.01,step%8==7)
     writer.flush()
-    result=execute(native,['-m','src.app.pipeline.provider_worker','package://d3rlpy-suite/d3rlpy_runner.py',
-        'agent=d3rlpy/bc','env=gym_classic_control/cartpole','paradigm=offline_rl',
+    execute(native,['-m','src.app.pipeline.provider_worker','src/app/train.py',
+        'paradigm=offline_rl','agent=d3rlpy/bc','++agent.name=bc','model=d3rlpy/vector','env=gym_classic_control/cartpole',
         'dataset_path='+str(dataset),'agent.n_steps=2','agent.batch_size=8','group=native','experiment_id=offline'])
-    assert 'Loading transitions' in result.stdout
-    assert list((native.paths.results/'checkpoints/native/offline').rglob('latest_model.d3'))
+    run=native.paths.results/'checkpoints/native/offline/bc'
+    record=json.loads(next(run.glob('*/execution.json')).read_text())
+    assert record['status']=='completed' and record['metadata']['backend']=='d3rlpy'
+    assert list(run.glob('*/latest_model.d3'))
 
 
 def test_native_experiment_export_keeps_provider_dependency_ownership(native,tmp_path):
@@ -298,21 +310,17 @@ def test_native_experiment_export_keeps_provider_dependency_ownership(native,tmp
         assert 'configs/experiment/robotics/_base.yaml' in archive.namelist()
 
 
-def test_selected_tuner_objective_and_slurm_command(native):
-    from omegaconf import OmegaConf
-    from src.app.pipeline.tuners import get_tuner
+def test_selected_objective_and_backend(native):
+    from src.app.core.execution import execution_backend
     from src.app.objectives.api import create_objective,TrialResults
-    from src.app.pipeline.engine import resolve_engine
-    from src.app.pipeline.slurm import generate_sbatch_script
-    assert get_tuner().api_version==1
+    from src.app.pipeline.engine import DEFAULT_ENGINE_SCRIPT,resolve_engine
     objective=create_objective('native_score',workspace=native.paths.root)
     objective.source.write_text('def evaluate(results, params):\n    return 4.5\n')
     assert objective.evaluate(TrialResults([],{}),{}).value==4.5
-    cfg=OmegaConf.create({'group':'native','experiment_id':'remote','site':{},'agent':{'entrypoint':'package://sb3-suite/sb3_runner.py'}})
-    assert resolve_engine({},cfg)[0]=='package://sb3-suite/sb3_runner.py'
-    # Generic Slurm wrapping must preserve the native worker protocol; full per-method dispatch is in slurm_runner.
-    text=generate_sbatch_script('native',['agent=sb3/ppo','model=basics/dnn'],str(native.paths.results/'slurm'),cfg)
-    assert '-m src.app.pipeline.provider_worker package://sb3-suite/sb3_runner.py' in text
+    # Packages select backends through capability metadata; every method runs the Theta bootstrap.
+    for agent,backend in (('sb3/ppo','sb3'),('d3rlpy/cql','d3rlpy')):
+        assert resolve_engine({'agent':agent})[0]==DEFAULT_ENGINE_SCRIPT
+        assert execution_backend({'agent':agent},paths=native.paths)[0]==backend
 
 
 def test_obsidian_activation_settings_and_loaded_provider_lease(native):
@@ -345,14 +353,16 @@ def test_train_py_resolves_the_autoencoder_from_a_composed_config(native):
     from hydra import compose, initialize_config_dir
     from hydra.core.global_hydra import GlobalHydra
 
+    from src.app.config_resolution import configuration_context
     from src.app.core.paradigm_loader import get_component
     from src.app.pipeline.validation import paradigm_uses_agents
     paths=native.paths
     GlobalHydra.instance().clear()
     try:
-        with initialize_config_dir(config_dir=str(paths.framework_config),version_base=None):
+        # The same search path and resolution context train.py's launch() establishes.
+        with configuration_context(paths),initialize_config_dir(config_dir=str(paths.primary_config),version_base=None):
             cfg=compose(config_name='config',overrides=['paradigm=unsupervised','model=basics/autoencoder',
-                'hydra.searchpath=[file://'+str(paths.config)+']'])
+                'hydra.searchpath=['+','.join(paths.config_searchpath())+']'])
     finally:
         GlobalHydra.instance().clear()
 
@@ -390,14 +400,15 @@ def test_native_blendrl_editable_copy_owns_its_auxiliary_plot(native):
     from src.app.core.provider_loader import resolve_provider
     original=ProviderCatalog(native.paths).package('blendrl')
     before=content_hash(original.root)
-    profile=LocalComponents(native.paths).deep_copy(native.paths.config/'model/blendrl.yaml','native_blendrl_copy')
+    packaged=native.paths.config_resolver().resolve('model/blendrl.yaml').file
+    profile=LocalComponents(native.paths).deep_copy(packaged,'native_blendrl_copy')
     copied=ProviderCatalog(native.paths).package('native_blendrl_copy')
     assert copied.manifest['parent']['id']=='blendrl'
     assert copied.manifest['dependencies']==original.manifest['dependencies']
-    assert profile==native.paths.config/'model/native_blendrl_copy.yaml'
+    assert profile.is_file() and profile.is_relative_to(copied.root)
     assert (copied.root/'plot/blendrl/routing.py').is_file()
-    plot=native.paths.config/'plot/native_blendrl_copy/blend_routing.yaml'
-    assert plot.is_file()
+    plot=native.paths.config_resolver().resolve('plot/native_blendrl_copy/blend_routing.yaml')
+    assert plot is not None and plot.package.id=='native_blendrl_copy'
     assert resolve_provider('model','native_blendrl_copy',native.paths) is not resolve_provider('model','blendrl',native.paths)
     assert resolve_provider('model','blender',native.paths) is resolve_provider('model','blendrl',native.paths)
     assert resolve_provider('plotter','native_blendrl_copy/blend_routing',native.paths) is not None
@@ -412,13 +423,18 @@ def test_native_blendrl_editable_copy_owns_its_auxiliary_plot(native):
 
 def test_native_sb3_real_optuna_trial_and_checkpoint(native):
     import optuna
-    from src.app.pipeline.optuna_utils import promote_best_trial_checkpoint
+    # Tuning is an optional component; install the IDE's Optuna package into this workspace.
+    sys.path.insert(0,str(IDE/'tests'))
+    from component_fixtures import install_optional
+    install_optional(native.paths,'optuna',native.base/'optional-archives')
+    promote_best_trial_checkpoint=load_module(ProviderCatalog(native.paths).package('optuna'),'utils.py',
+                                              paths=native.paths).promote_best_trial_checkpoint
     storage='sqlite:///'+str(native.base/'native-study.db')
-    execute(native,['-m','src.app.pipeline.provider_worker','package://sb3-suite/sb3_runner.py',
-        '--multirun','agent=sb3/ppo','env=gym_classic_control/cartpole','model=basics/dnn',
+    execute(native,['-m','src.app.pipeline.provider_worker','src/app/train.py',
+        '--multirun','paradigm=online_rl','agent=sb3/ppo','++agent.name=sb3_agent','env=gym_classic_control/cartpole','model=basics/dnn',
         'total_timesteps=8','eval_episodes=1','+eval_freq_steps=8','agent.n_steps=8',
         'agent.batch_size=4','agent.n_epochs=1','env.num_envs=1','group=native',
-        'experiment_id=tuned','+tuning.metric=eval/reward','hydra/sweeper=optuna_online',
+        'experiment_id=tuned','+tuning.metric=eval/reward','+tuning.component=optuna','hydra/sweeper=optuna_online',
         'hydra.sweeper.n_trials=1','hydra.sweeper.study_name=native-study',
         'hydra.sweeper.storage='+storage,'agent.learning_rate=choice(0.001,0.002)'])
     study=optuna.load_study(study_name='native-study',storage=storage)
@@ -445,11 +461,9 @@ def test_native_cartpole_sb3_objective_worker(native,tmp_path):
     from omegaconf import OmegaConf
     cfg=OmegaConf.create({'group':'g','experiment_id':'e','paradigm':'online_rl','seed':1,
         'total_timesteps':8,'eval_episodes':1,'eval_freq_steps':8,
-        'agent':{'name':'m','algorithm':'PPO','n_steps':8,'batch_size':4,'n_epochs':1,
-                 'entrypoint':'package://sb3-suite/sb3_runner.py'},
+        'agent':{'name':'m','algorithm':'sb3/ppo','backend':'sb3','n_steps':8,'batch_size':4,'n_epochs':1},
         'model':{'sb3_native_policy':True},'env':{'name':'cartpole','env_id':'CartPole-v1'},
         'objective':{'component':'learning_curve'},
-        'theta_execution':{'script':'package://sb3-suite/sb3_runner.py'},
         'variability':{'training_seeds':[1,2],'parallel_runs':2,'evaluation_seed':10}})
     OmegaConf.save(cfg,tmp_path/'test.yaml')
     execute(native,['-m','src.app.pipeline.repeated_task','--config-path',str(tmp_path),'--config-name','test'])
@@ -476,8 +490,7 @@ def test_native_sb3_replicates_record_episodes(native,monkeypatch):
     cfg=OmegaConf.create({'group':'replicates','experiment_id':'e','experiment_name':'native_replicates',
         'paradigm':'online_rl','eval_episodes':2,
         'variability':{'training_seeds':[1,2],'evaluation_seed':100,'parallel_runs':1}})
-    context={'methods':{'m':{'agent':'sb3/ppo','model':'basics/dnn',
-        'entrypoint':'package://sb3-suite/sb3_runner.py','python':sys.executable}},
+    context={'methods':{'m':{'agent':'sb3/ppo','model':'basics/dnn','python':sys.executable}},
         'sanitized_extra_args':['agent.n_steps=8','agent.batch_size=4','agent.n_epochs=1'],
         'storage_url':None,'is_sweep':False,'is_interactive':True}
     monkeypatch.chdir(native.paths.root)
@@ -487,7 +500,8 @@ def test_native_sb3_replicates_record_episodes(native,monkeypatch):
     for run in execution.runs():
         assert run['status']=='completed'
         assert (native.paths.root/run['checkpoints']/'latest_model.zip').is_file()
-        events=execution.events(run)
+        # The runner records matched greedy and sampled evaluations; greedy keeps eval/reward.
+        events=[event for event in execution.events(run) if event.get('metric')=='eval/reward']
         assert [event['training_step'] for event in events]==[0,8]
         assert all(len(event['episode_outcomes'])==2 and event['deterministic_actions'] for event in events)
         assert [event['evaluation_seed'] for event in events]==[100,101]

@@ -16,8 +16,8 @@ try:
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
     app = QApplication.instance() or QApplication(sys.argv[:1])
     from frontend.app import Window
-    from frontend.plugins.base import PluginManifest
-    from frontend.plugins.context import PluginContext
+    from src.app.api.desktop import PluginManifest
+    from src.app.api.desktop import PluginContext
     from plugins.antigravity import AntigravityPlugin, AntigravitySettingsWidget
     from plugins.antigravity.panel import AntigravityPanel
     HAS_PYQT6 = True
@@ -26,8 +26,8 @@ except ImportError:
         # Fallback for running from within theta-plugins repo
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
         from frontend.app import Window
-        from frontend.plugins.base import PluginManifest
-        from frontend.plugins.context import PluginContext
+        from src.app.api.desktop import PluginManifest
+        from src.app.api.desktop import PluginContext
         from plugins.antigravity import AntigravityPlugin, AntigravitySettingsWidget
         from plugins.antigravity.panel import AntigravityPanel
         HAS_PYQT6 = True

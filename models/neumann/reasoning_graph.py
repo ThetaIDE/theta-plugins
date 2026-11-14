@@ -10,9 +10,9 @@ from tqdm import tqdm
 
 from .fol.logic import Clause, Conjunction
 from .logic_utils import generate_substitutions
-from src.app.core.provider_loader import provider_object
-subs_list = provider_object('nsfr', 'fol/logic_ops.py:subs_list')
-unify = provider_object('nsfr', 'fol/logic_ops.py:unify')
+from src.app.api.packages import provider_export
+subs_list = provider_export('nsfr', 'subs_list')
+unify = provider_export('nsfr', 'unify')
 
 logger = logging.getLogger(__name__)
 

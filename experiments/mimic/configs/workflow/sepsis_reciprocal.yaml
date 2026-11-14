@@ -50,7 +50,7 @@ nodes:
     label: MIMIC Patient Transitions
     category: data
     paradigm: dataset
-    experiment_ref: in/datasets/mimic
+    experiment_ref: src/usr/datasets/mimic
     overrides: []
     pos:
     - 60
@@ -60,7 +60,7 @@ nodes:
     - name: dataset
       direction: output
       port_type: dataset
-      description: 'Static offline dataset: in/datasets/mimic'
+      description: 'Static offline dataset: src/usr/datasets/mimic'
       param_binding: ''
       required: false
   feature_augmenter:

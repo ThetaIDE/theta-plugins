@@ -2,5 +2,5 @@ enabled: true
 remake: false
 n_splits: 20
 use_volatility: true
-dataset_path: "in/datasets/mimic/mimic_lazy_12_clean_with_interventions_corrected.npz"
+dataset_path: "src/usr/datasets/mimic/mimic_lazy_12_clean_with_interventions_corrected.npz"
 ep_ckpt_root: "results/checkpoints/early_prediction"
