@@ -2,7 +2,7 @@
   "id": "mlp",
   "name": "Multi-Layer Perceptron (MLP)",
   "kind": "model",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Standard Multi-Layer Perceptron neural network architectures for classification, value estimation, and policy modeling.",
   "author": {
     "name": "Theta-IDE Team"
@@ -12,7 +12,6 @@
     "offline_rl",
     "supervised"
   ],
-  "target_path": "src/usr/models/mlp",
   "config_path": "in/config/model/basics/mlp.yaml",
   "config_paths": [
     "in/config/model/basics/mlp.yaml",
@@ -75,6 +74,83 @@
           }
         }
       }
+    }
+  },
+  "dependencies": {
+    "components": [
+      "nature_cnn"
+    ],
+    "pip": []
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "standard_mlp_actor",
+      "kind": "model",
+      "entry_point": "mlp_model.py:StandardMLPActor",
+      "aliases": [
+        "standard_mlp",
+        "neural_blender_mlp"
+      ]
+    },
+    {
+      "id": "value_network",
+      "kind": "model",
+      "entry_point": "mlp_model.py:ValueNetwork",
+      "aliases": [
+        "cnn_value_network"
+      ]
+    },
+    {
+      "id": "mlp",
+      "kind": "model",
+      "entry_point": "mlp_model.py:MLPQNetwork",
+      "aliases": [
+        "mlpqnetwork",
+        "basics/mlp"
+      ]
+    },
+    {
+      "id": "mlp_value_network",
+      "kind": "model",
+      "entry_point": "mlp_model.py:MLPValueNetwork",
+      "aliases": []
+    },
+    {
+      "id": "q_network",
+      "kind": "model",
+      "entry_point": "mlp_model.py:QNetwork",
+      "aliases": [
+        "cnn_q_network"
+      ]
+    },
+    {
+      "id": "mlp_classifier",
+      "kind": "model",
+      "entry_point": "mlp_model.py:MLPClassifier",
+      "aliases": [
+        "tabular_classifier",
+        "classifier",
+        "basics/mlp_classifier"
+      ]
+    },
+    {
+      "id": "MLPClassifierLightningModule",
+      "kind": "component",
+      "entry_point": "training.py:MLPClassifierLightningModule"
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "__init__.py",
+      "mlp_model.py",
+      "training.py"
+    ],
+    "resources": [],
+    "configs": {
+      "in/config/model/basics/mlp.yaml": "configs/model/basics/mlp.yaml",
+      "in/config/model/basics/mlp_classifier.yaml": "configs/model/basics/mlp_classifier.yaml"
     }
   }
 }

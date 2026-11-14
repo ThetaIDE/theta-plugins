@@ -4,10 +4,9 @@ import torch_geometric.nn
 from torch import Tensor
 from torch.nn import Linear, ReLU, Sequential
 from torch_geometric.nn import MessagePassing
-from torch_scatter import gather_csr, scatter, segment_csr
 
 # from neural_utils import MLP
-from neumann.scatter import *
+from .scatter import *
 
 
 class Atom2ConjConv(MessagePassing):

@@ -1,4 +1,0 @@
-name: mlp
-type: mlp
-hidden_dims: [64, 64]
-activation: relu

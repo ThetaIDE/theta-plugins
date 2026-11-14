@@ -1,4 +1,0 @@
-name: dense_autoencoder
-type: dense_autoencoder
-latent_dim: 8
-hidden_dims: [32, 16]

@@ -2,13 +2,12 @@
   "id": "mimic-early-prediction",
   "name": "MIMIC Early Prediction Evaluator",
   "kind": "evaluator",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Septic shock early prediction evaluator, AUPRC scoring, counterfactual analysis, and agreement metrics.",
   "author": {
     "name": "Theta Clinical Team"
   },
   "created_at": "2026-10-18T00:00:00Z",
-  "target_path": "src/usr/eval/early_prediction",
   "config_path": "in/config/eval/mimic/early_prediction.yaml",
   "compatibility": {
     "theta": ">=2.0.0"
@@ -41,6 +40,43 @@
       "ep_ckpt_root": {
         "type": "string"
       }
+    }
+  },
+  "dependencies": {
+    "components": [],
+    "pip": []
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "EPSepsisDataModule",
+      "kind": "component",
+      "entry_point": "data_module.py:EPSepsisDataModule",
+      "aliases": [
+        "SepsisDataModule"
+      ]
+    },
+    {
+      "id": "mimic-early-prediction",
+      "kind": "evaluator",
+      "entry_point": "eval_logic.py:compute_ep_eval_data",
+      "aliases": [
+        "early_prediction"
+      ]
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "data_module.py",
+      "eval_logic.py",
+      "__init__.py",
+      "lightning_module.py",
+      "model.py"
+    ],
+    "resources": [],
+    "configs": {
+      "in/config/eval/mimic/early_prediction.yaml": "configs/eval/mimic/early_prediction.yaml"
     }
   }
 }

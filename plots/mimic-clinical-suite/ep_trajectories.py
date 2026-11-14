@@ -2,9 +2,10 @@
 from pathlib import Path
 from typing import Optional
 
-from plot.base import BasePlotter
-from plot.ep_cache import get_ep_eval_data
-from src.usr.eval.early_prediction.eval_logic import plot_ep_shock_over_tau
+from src.app.core.plotting.base import BasePlotter
+from .ep_cache import get_ep_eval_data
+from src.app.core.provider_loader import provider_object
+plot_ep_shock_over_tau = provider_object('mimic-early-prediction', 'eval_logic.py:plot_ep_shock_over_tau')
 
 
 class EpTrajectoriesPlotter(BasePlotter):

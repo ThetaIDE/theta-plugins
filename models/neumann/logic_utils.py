@@ -1,9 +1,9 @@
 import logging
 from tqdm import tqdm
 
-from neumann.fol.data_utils import DataUtils
-from neumann.fol.language import DataType
-from neumann.fol.logic import *
+from .fol.data_utils import DataUtils
+from .fol.language import DataType
+from .fol.logic import *
 
 logger = logging.getLogger(__name__)
 

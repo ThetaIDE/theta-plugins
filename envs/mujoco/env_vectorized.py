@@ -23,7 +23,8 @@ class VectorizedEnv(VectorizedBaseEnv):
     name = "mujoco"
 
     def __init__(self, name: str | None = None, env_id: str | None = None, n_envs: int = 1, seed: int | None = None, mode: str = "ppo", **kwargs):
-        super().__init__(mode)
+        super().__init__()
+        self.mode = mode
         task = (name or "ant").split("/")[-1].lower()
         self.env_id = env_id or ENV_IDS.get(task, task)
         self.n_envs = max(1, int(n_envs))

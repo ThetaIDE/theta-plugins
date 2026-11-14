@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 
-from src.usr.eval.early_prediction.data_module import EPSepsisDataset, collate_ep_batch
-from src.usr.eval.early_prediction.model import FocalLoss, SepsisLSTM, SepsisTransformer
+from .data_module import EPSepsisDataset, collate_ep_batch
+from .model import FocalLoss, SepsisLSTM, SepsisTransformer
 
 
 class EPSepsisLightningModule(L.LightningModule):

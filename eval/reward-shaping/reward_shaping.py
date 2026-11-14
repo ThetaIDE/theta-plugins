@@ -24,9 +24,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-PROJECT_ROOT = str(Path(__file__).resolve().parents[3])
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
 
 from src.app.core.eval_registry import register_evaluator
 
@@ -89,7 +86,9 @@ class EPRewardShaper:
 
     def _load_ep_models(self):
         """Load EP model checkpoints from the checkpoint directory."""
-        from src.usr.eval.early_prediction.model import SepsisLSTM, SepsisTransformer
+        from src.app.core.provider_loader import provider_object
+        SepsisLSTM = provider_object('mimic-early-prediction', 'model.py:SepsisLSTM')
+        SepsisTransformer = provider_object('mimic-early-prediction', 'model.py:SepsisTransformer')
 
         if not self.ep_ckpt_dir.exists():
             print(f"WARNING: EP checkpoint directory {self.ep_ckpt_dir} does not exist.")
@@ -191,7 +190,9 @@ class EPRewardShaper:
         Returns:
             probs: numpy array (N,) of averaged P(shock) predictions
         """
-        from src.usr.eval.early_prediction.model import evaluate_lstm_model, evaluate_transformer_model
+        from src.app.core.provider_loader import provider_object
+        evaluate_lstm_model = provider_object('mimic-early-prediction', 'model.py:evaluate_lstm_model')
+        evaluate_transformer_model = provider_object('mimic-early-prediction', 'model.py:evaluate_transformer_model')
 
         if not self._models or not sequences:
             return np.zeros(len(sequences), dtype=np.float32)
@@ -229,7 +230,8 @@ class EPRewardShaper:
         Returns:
             potentials: (T,) array of Φ(s_t) = -P(shock|s_t)
         """
-        from src.usr.eval.early_prediction.model import compute_volatility_features
+        from src.app.core.provider_loader import provider_object
+        compute_volatility_features = provider_object('mimic-early-prediction', 'model.py:compute_volatility_features')
 
         T = trajectory_obs.shape[0]
         if T == 0:
@@ -385,7 +387,7 @@ class EPRewardShaper:
         if not cql_ckpt_path or not cql_ckpt_path.exists():
             raise FileNotFoundError(f"Could not find a valid CQL checkpoint for V(s) computation at: {ckpt_path}")
 
-        from src.usr.algorithms.agent_registry import get_agent_class
+        from src.app.core.agent_registry import get_agent_class
         agent_cls = get_agent_class("cql")
 
         torch.serialization.add_safe_globals(

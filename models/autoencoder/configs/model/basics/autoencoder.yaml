@@ -1,0 +1,5 @@
+name: autoencoder
+type: autoencoder
+latent_dim: 16
+hidden_dims: [64, 32]
+lightning_module: AutoencoderLightningModule

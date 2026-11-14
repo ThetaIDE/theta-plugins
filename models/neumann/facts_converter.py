@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-from neumann.fol.logic import NeuralPredicate
+from .fol.logic import NeuralPredicate
 
 
 class FactsConverter(nn.Module):

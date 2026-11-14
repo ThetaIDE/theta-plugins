@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from plot.base import BasePlotter, clean_label, get_style_info, moving_average
+from src.app.core.plotting.base import BasePlotter, clean_label, get_style_info, moving_average
 
 
 class ConvergencePlotter(BasePlotter):

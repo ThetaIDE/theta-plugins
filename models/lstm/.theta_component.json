@@ -2,7 +2,7 @@
   "id": "lstm",
   "name": "LSTM Recurrent Neural Network",
   "kind": "model",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Long Short-Term Memory (LSTM) recurrent network architecture with temporal attention pooling.",
   "author": {
     "name": "Theta-IDE Team"
@@ -12,7 +12,6 @@
     "offline_rl",
     "supervised"
   ],
-  "target_path": "src/usr/models/lstm",
   "config_path": "in/config/model/basics/lstm.yaml",
   "config_paths": [
     "in/config/model/basics/lstm.yaml"
@@ -38,6 +37,33 @@
       "bidirectional": {
         "type": "boolean"
       }
+    }
+  },
+  "dependencies": {
+    "components": [],
+    "pip": []
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "lstm",
+      "kind": "model",
+      "entry_point": "lstm_model.py:LSTMModel",
+      "aliases": [
+        "sepsis_lstm",
+        "basics/lstm"
+      ]
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "__init__.py",
+      "lstm_model.py"
+    ],
+    "resources": [],
+    "configs": {
+      "in/config/model/basics/lstm.yaml": "configs/model/basics/lstm.yaml"
     }
   }
 }

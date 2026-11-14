@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from src.app.core.model_registry import register_model
-from nsfr.utils.logic import get_index_by_predname
+from .utils.logic import get_index_by_predname
 
 
 @register_model("nsfr")

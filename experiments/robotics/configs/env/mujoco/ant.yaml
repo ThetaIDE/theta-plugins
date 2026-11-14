@@ -1,0 +1,10 @@
+name: mujoco/ant
+compatible_paradigms: [online_rl]
+monitor_metric: "eval/reward"
+preprocess_on_load: false
+env_id: Ant-v5
+num_envs: 1
+num_steps: 2048
+gamma: 0.99
+gae_lambda: 0.95
+default_plots: [convergence, losses, reports]

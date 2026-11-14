@@ -7,7 +7,8 @@ class VectorizedEnv(VectorizedBaseEnv):
     """Vectorized environment presenting MNIST/Digits samples for RL and supervised benchmarking."""
 
     def __init__(self, name="mnist", n_envs=1, seed=None, mode="supervised", **kwargs):
-        super().__init__(mode)
+        super().__init__()
+        self.mode = mode
         self.name = name
         self.n_envs = max(1, int(n_envs))
         self.seed = seed

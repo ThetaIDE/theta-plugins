@@ -29,7 +29,8 @@ class VectorizedEnv(VectorizedBaseEnv):
         mode: str = "ppo",
         **kwargs,
     ):
-        super().__init__(mode)
+        super().__init__()
+        self.mode = mode
         resolved_name = (name or "cartpole").split("/")[-1].lower()
         self.env_id = env_id or GYM_MAP.get(resolved_name, f"{resolved_name.capitalize()}-v1")
         self.n_envs = max(1, int(n_envs))

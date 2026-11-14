@@ -1,4 +1,0 @@
-# Canonical Nature CNN architecture (Mnih et al., 2015)
-architecture: nature_cnn
-in_channels: 4
-features_dim: 512

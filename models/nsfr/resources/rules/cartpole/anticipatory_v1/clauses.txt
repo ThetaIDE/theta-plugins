@@ -1,0 +1,4 @@
+left(X):-short_fall_left(X).
+left(X):-long_fall_left(X).
+right(X):-short_fall_right(X).
+right(X):-long_fall_right(X).

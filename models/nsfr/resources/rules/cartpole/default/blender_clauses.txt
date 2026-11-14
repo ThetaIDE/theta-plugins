@@ -1,0 +1,2 @@
+logic_agent(X):-is_stable(E).
+neural_agent(X):-not_stable(E).

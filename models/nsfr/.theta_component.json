@@ -2,12 +2,11 @@
   "id": "nsfr",
   "name": "Neural Symbolic Forward Reasoner (NSFR)",
   "kind": "model",
-  "version": "1.0.0",
+  "version": "1.0.7",
   "description": "Differentiable forward reasoning engine computing soft valuations over first-order logic clauses.",
   "author": {
     "name": "Hikaru Shindo"
   },
-  "target_path": "src/usr/models/nsfr",
   "config_path": "in/config/model/nsfr.yaml",
   "config_paths": [
     "in/config/model/nsfr.yaml"
@@ -19,11 +18,79 @@
     "type": "object",
     "properties": {
       "rules": {
-        "type": "string"
+        "type": "string",
+        "x-theta-domain": "ruleset",
+        "x-theta-actions": [
+          {
+            "type": "open-in-editor",
+            "label": "Open rules folder",
+            "handler": {
+              "path": "package://nsfr/editor_actions.py",
+              "function": "rules_edit_targets"
+            }
+          }
+        ],
+        "description": "Environment-scoped ruleset name, or environment/name in an unscoped model profile."
       },
       "logic_type": {
         "type": "string"
       }
+    }
+  },
+  "dependencies": {
+    "components": [],
+    "pip": [
+      "lark",
+      "tqdm"
+    ]
+  },
+  "rules_root": "resources/rules",
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "nsfr",
+      "kind": "model",
+      "entry_point": "common.py:get_nsfr_model",
+      "aliases": []
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "nsfr.py",
+      "nsfr_beam.py",
+      "mode_declaration.py",
+      "editor_actions.py",
+      "__init__.py",
+      "refinement.py",
+      "facts_converter.py",
+      "results_plusplus.py",
+      "common.py",
+      "valuation.py",
+      "clause_generator.py",
+      "infer.py",
+      "tensor_encoder.py",
+      "fol/__init__.py",
+      "fol/logic.py",
+      "fol/data_utils.py",
+      "fol/language.py",
+      "fol/logic_ops.py",
+      "fol/exp_parser.py",
+      "utils/neural.py",
+      "utils/__init__.py",
+      "utils/logic.py",
+      "utils/common.py",
+      "utils/valuation.py",
+      "utils/beam.py",
+      "utils/torch.py"
+    ],
+    "resources": [
+      "resources",
+      "lark",
+      "fol/exp.lark"
+    ],
+    "configs": {
+      "in/config/model/nsfr.yaml": "configs/model/nsfr.yaml"
     }
   }
 }

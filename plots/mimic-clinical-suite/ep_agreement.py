@@ -2,9 +2,10 @@
 from pathlib import Path
 from typing import Optional
 
-from plot.base import BasePlotter
-from plot.ep_cache import get_ep_eval_data
-from src.usr.eval.early_prediction.eval_logic import plot_agreement_vs_shock
+from src.app.core.plotting.base import BasePlotter
+from .ep_cache import get_ep_eval_data
+from src.app.core.provider_loader import provider_object
+plot_agreement_vs_shock = provider_object('mimic-early-prediction', 'eval_logic.py:plot_agreement_vs_shock')
 
 
 class EpAgreementPlotter(BasePlotter):

@@ -1,0 +1,19 @@
+name: mimic
+monitor_metric: "val/loss"
+env_id: mimic
+offline_only: true
+preprocess_on_load: false
+gamma: 0.95
+gae_lambda: 0.95
+reward_type: tqn
+dataset_name: mimic_lazy_0_interventions_balanced.npz
+
+reward_shaping:
+  ep_ckpt_dir: "results/checkpoints/early_prediction"
+  lambda_coef: 1.0
+  gamma: 0.95
+  window_hours: 12
+  ep_arch: null
+  cql_ckpt_dir: null
+
+default_plots: [losses, clinical_alignment, clinical, reports]

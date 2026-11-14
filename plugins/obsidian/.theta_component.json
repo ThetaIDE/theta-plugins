@@ -1,0 +1,38 @@
+{
+  "id": "obsidian-notes",
+  "name": "Obsidian Notes",
+  "version": "1.0.1",
+  "description": "Embedded Obsidian markdown vault browser, research notebook, and NeSyRL experiment logger.",
+  "author": "NeSyRL Team",
+  "default_enabled": false,
+  "icon": "obsidian",
+  "entry_point": "ObsidianPlugin",
+  "kind": "plugin",
+  "dependencies": {
+    "components": [],
+    "pip": [
+      "PyQt6",
+      "PyQt6-WebEngine"
+    ]
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "obsidian",
+      "kind": "plugin",
+      "entry_point": "__init__.py:ObsidianPlugin"
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "__init__.py",
+      "panel.py"
+    ],
+    "resources": [
+      "obsidian.svg"
+    ],
+    "configs": {}
+  },
+  "config_paths": []
+}

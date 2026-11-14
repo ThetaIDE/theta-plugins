@@ -5,6 +5,7 @@ Supports configurable hidden sizes, LayerNorm, GELU/ReLU/Tanh activations, and o
 """
 from __future__ import annotations
 
+import copy
 import numpy as np
 import torch
 import torch.nn as nn
@@ -23,7 +24,7 @@ def layer_init(layer: nn.Module, std: float = np.sqrt(2), bias_const: float = 0.
     return layer
 
 
-@register_model("dnn", "mlp", "standard_mlp")
+@register_model("dnn")
 class DNNModel(nn.Module):
     """Configurable Multi-Layer Perceptron (DNN) for actor-critic policy and Q-value approximation."""
 
@@ -36,6 +37,7 @@ class DNNModel(nn.Module):
         dueling: bool | None = None,
         activation: str | None = None,
         dropout: float = 0.0,
+        shared_features: bool = True,
         **kwargs,
     ):
         super().__init__()
@@ -51,14 +53,12 @@ class DNNModel(nn.Module):
         self.dueling = (max_width >= 128) if dueling is None else bool(dueling)
 
         # Activation resolution
-        if activation == "relu":
-            act_fn = nn.ReLU
-        elif activation == "gelu":
-            act_fn = nn.GELU
-        elif activation == "tanh":
-            act_fn = nn.Tanh
-        else:
-            act_fn = nn.GELU if max_width >= 128 else nn.ReLU
+        activations = {"relu": nn.ReLU, "gelu": nn.GELU, "tanh": nn.Tanh,
+                       "elu": nn.ELU, "silu": nn.SiLU, "sigmoid": nn.Sigmoid,
+                       "leaky_relu": nn.LeakyReLU, "identity": nn.Identity}
+        if activation is not None and activation not in activations:
+            raise ValueError(f"Unsupported DNN activation {activation!r}.")
+        act_fn = activations[activation] if activation is not None else (nn.GELU if max_width >= 128 else nn.ReLU)
 
         layers: list[nn.Module] = []
         last_size = num_in_features
@@ -71,6 +71,9 @@ class DNNModel(nn.Module):
                 layers.append(nn.Dropout(dropout))
             last_size = size
         self.network = nn.Sequential(*layers)
+        # PPO can use independent policy/value features. Keep the legacy shared
+        # default so existing checkpoints retain their topology.
+        self.value_network = None if shared_features else copy.deepcopy(self.network)
 
         if self.dueling:
             val_dim = max(32, last_size // 2)
@@ -119,7 +122,7 @@ class DNNModel(nn.Module):
             x = x[:, : self.num_in_features]
 
         hidden = self.network(x)
-        val = self.value_head(hidden)
+        val = self.value_head(self.value_network(x) if self.value_network is not None else hidden)
         adv = self.advantage_head(hidden)
         if self.dueling:
             return val + (adv - adv.mean(dim=-1, keepdim=True))
@@ -132,7 +135,7 @@ class DNNModel(nn.Module):
             x = torch.cat([x, pad], dim=-1)
         elif x.shape[-1] > self.num_in_features:
             x = x[:, : self.num_in_features]
-        hidden = self.network(x)
+        hidden = self.network(x) if self.value_network is None else self.value_network(x)
         return self.value_head(hidden)
 
     def get_action_and_value(self, x: torch.Tensor, action: torch.Tensor | None = None) -> ActionResult:
@@ -144,7 +147,7 @@ class DNNModel(nn.Module):
             x = x[:, : self.num_in_features]
 
         hidden = self.network(x)
-        val = self.value_head(hidden)
+        val = self.value_head(self.value_network(x) if self.value_network is not None else hidden)
         adv = self.advantage_head(hidden)
         logits = (adv - adv.mean(dim=-1, keepdim=True)) if self.dueling else adv
         probs = Categorical(logits=logits)

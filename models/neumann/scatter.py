@@ -42,7 +42,12 @@ def scatter_add(src: torch.Tensor, index: torch.Tensor, dim: int = -1,
 def scatter_mul(src: torch.Tensor, index: torch.Tensor, dim: int = -1,
                 out: torch.Tensor | None = None,
                 dim_size: int | None = None) -> torch.Tensor:
-    return torch.ops.torch_scatter.scatter_mul(src, index, dim, out, dim_size)
+    index = broadcast(index, src, dim)
+    if out is None:
+        size = list(src.shape)
+        size[dim] = dim_size if dim_size is not None else (int(index.max()) + 1 if index.numel() else 0)
+        out = torch.ones(size, dtype=src.dtype, device=src.device)
+    return out.scatter_reduce_(dim, index, src, reduce="prod", include_self=True)
 
 
 def scatter_mean(src: torch.Tensor, index: torch.Tensor, dim: int = -1,

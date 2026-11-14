@@ -1,8 +1,0 @@
-# Default configuration for Tabular Data Module
-data_module: tabular_data
-batch_size: 128
-val_split: 0.2
-test_split: 0.1
-normalize: true
-num_workers: 0
-pin_memory: false

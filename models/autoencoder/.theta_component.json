@@ -2,7 +2,7 @@
   "id": "autoencoder",
   "name": "Dense & Sequence Autoencoders",
   "kind": "model",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Dense and sequence autoencoder architectures for unsupervised representation learning.",
   "author": {
     "name": "Theta-IDE Team"
@@ -11,7 +11,6 @@
     "unsupervised",
     "supervised"
   ],
-  "target_path": "src/usr/models/autoencoder",
   "config_path": "in/config/model/basics/autoencoder.yaml",
   "config_paths": [
     "in/config/model/basics/autoencoder.yaml",
@@ -49,6 +48,53 @@
           }
         }
       }
+    }
+  },
+  "dependencies": {
+    "components": [],
+    "pip": []
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "autoencoder",
+      "kind": "model",
+      "entry_point": "autoencoder_model.py:SequenceAutoencoder",
+      "aliases": [
+        "sequence_autoencoder",
+        "seq_autoencoder",
+        "basics/autoencoder"
+      ]
+    },
+    {
+      "id": "dense_autoencoder",
+      "kind": "model",
+      "entry_point": "autoencoder_model.py:DenseAutoencoder",
+      "aliases": [
+        "mlp_autoencoder",
+        "basics/dense_autoencoder"
+      ]
+    },
+    {
+      "id": "AutoencoderLightningModule",
+      "kind": "component",
+      "entry_point": "training.py:AutoencoderLightningModule",
+      "aliases": [
+        "autoencoder_training"
+      ]
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "__init__.py",
+      "autoencoder_model.py",
+      "training.py"
+    ],
+    "resources": [],
+    "configs": {
+      "in/config/model/basics/autoencoder.yaml": "configs/model/basics/autoencoder.yaml",
+      "in/config/model/basics/dense_autoencoder.yaml": "configs/model/basics/dense_autoencoder.yaml"
     }
   }
 }

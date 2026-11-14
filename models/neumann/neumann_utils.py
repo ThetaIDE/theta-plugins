@@ -9,16 +9,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
-from facts_converter import FactsConverter, FactsConverterWithQuery
+from .facts_converter import FactsConverter, FactsConverterWithQuery
 from img2facts import Img2Facts, Img2FactsWithQuery
-from logic_utils import add_true_atom
-from message_passing import MessagePassingModule
+from .logic_utils import add_true_atom
+from .message_passing import MessagePassingModule
 from percept import SlotAttentionLessColorsPerceptionModule, SlotAttentionPerceptionModule, YOLOPerceptionModule
-from reasoning_graph import ReasoningGraphModule
-from soft_logic import SoftLogic
-from valuation import SlotAttentionValuationModule, SlotAttentionWithQueryValuationModule, YOLOValuationModule
+from .reasoning_graph import ReasoningGraphModule
+from .soft_logic import SoftLogic
+from .valuation import SlotAttentionValuationModule, SlotAttentionWithQueryValuationModule, YOLOValuationModule
 
-from neumann import NEUMANN
+from . import NEUMANN
 
 
 def load_reasoning_graph(clauses, bk_clauses, atoms, terms, lang, term_depth, device, dataset, dataset_type):

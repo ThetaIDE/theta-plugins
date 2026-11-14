@@ -1,4 +1,0 @@
-# Executive summary report configuration for Pyrenees ITS benchmark
-format: markdown
-include_safety_metrics: true
-include_reachability: true

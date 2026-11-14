@@ -281,7 +281,7 @@ def normalize_features(X_train_list, X_test_list):
 
 
 def evaluate_lstm_model(model, X_test, input_dim, device="cpu"):
-    from src.usr.eval.early_prediction.data_module import EPSepsisDataset, collate_ep_batch
+    from .data_module import EPSepsisDataset, collate_ep_batch
 
     model.eval()
     model.to(device)
@@ -300,7 +300,7 @@ def evaluate_lstm_model(model, X_test, input_dim, device="cpu"):
 
 
 def evaluate_transformer_model(model, X_test, input_dim, device="cpu"):
-    from src.usr.eval.early_prediction.data_module import EPSepsisDataset, collate_ep_batch
+    from .data_module import EPSepsisDataset, collate_ep_batch
 
     model.eval()
     model.to(device)

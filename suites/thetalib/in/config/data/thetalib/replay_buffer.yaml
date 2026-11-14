@@ -1,7 +1,0 @@
-# Default configuration for Replay Buffer Data Module
-data_module: replay_buffer
-batch_size: 256
-val_split: 0.1
-chunk_size: 100000
-num_workers: 0
-pin_memory: false

@@ -21,16 +21,10 @@ from captum.attr import (
 )
 from torch.distributions.categorical import Categorical
 
-PROJECT_ROOT = str(Path(__file__).resolve().parents[5])
-for _p in [
-    os.path.join(PROJECT_ROOT, "src", "usr", "models"),
-    os.path.join(PROJECT_ROOT, "src", "usr", "environments"),
-]:
-    if _p not in sys.path and os.path.exists(_p):
-        sys.path.insert(0, _p)
-
-from nsfr.common import get_nsfr_model
-from nsfr.utils.common import load_module
+from src.app.core.provider_loader import provider_object
+get_nsfr_model = provider_object('nsfr', 'common.py:get_nsfr_model')
+from src.app.core.provider_loader import provider_object
+load_module = provider_object('nsfr', 'utils/common.py:load_module')
 from src.app.core.model_registry import register_model
 from src.app.core.types import ActionResult
 
@@ -44,7 +38,8 @@ def _softor(xs, dim=0, gamma=0.015):
     return result / maximum if maximum > 1.0 else result
 
 
-def _build_neural_agent(env_name, n_actions, device, arch_name=None, hidden_sizes=None, num_in_features=None):
+def _build_neural_agent(env_name, n_actions, device, arch_name=None, hidden_sizes=None, num_in_features=None,
+                        model_options=None):
     from src.app.core.model_registry import build_model
 
     return build_model(
@@ -54,6 +49,7 @@ def _build_neural_agent(env_name, n_actions, device, arch_name=None, hidden_size
         device=device,
         hidden_sizes=hidden_sizes or [64, 64],
         obs_dim=num_in_features,
+        **(model_options or {}),
     )
 
 
@@ -95,6 +91,7 @@ class BlenderActor(nn.Module):
         blend_function,
         device=None,
         explain=False,
+        logic_confidence_floor=0.05,
     ):
         """
         Initialize a BlendeRL agent.
@@ -109,6 +106,9 @@ class BlenderActor(nn.Module):
         self.blend_function = blend_function
         self.device = device
         self.explain = explain
+        self.logic_confidence_floor = None if logic_confidence_floor is None else float(logic_confidence_floor)
+        if self.logic_confidence_floor is not None and not 0 <= self.logic_confidence_floor < 1:
+            raise ValueError("logic_confidence_floor must be in [0, 1).")
 
         # Build mappings for logic-based blender if needed
         self.blender_id_to_pred_indices = self._build_blender_id_dict()
@@ -124,8 +124,8 @@ class BlenderActor(nn.Module):
 
         blender_mode_names = [f"agent_{i}" for i in range(len(self.policy_modules))]
         # Compatibility with legacy names if only 2 modules (neural, logic)
-        if len(self.policy_modules) == 2:
-            blender_mode_names = ["neural_agent", "logic_agent"]
+        if len(self.policy_modules) == 2 and set(self.module_types) == {"logic", "neural"}:
+            blender_mode_names = [f"{kind}_agent" for kind in self.module_types]
 
         blender_id_to_pred_indices = {i: [] for i in range(len(blender_mode_names))}
 
@@ -150,12 +150,18 @@ class BlenderActor(nn.Module):
         else:
             return q
 
-        # Normalize into a valid action probability distribution:
-        # If any action predicate is active, normalize proportionally across valid action candidates.
-        # If no action predicate is active (sum == 0, meaning logic is silent/unmatched):
-        # Default to safe action (e.g. "withhold" / "noop") rather than uniform 50/50 random.
-        sum_q = mapped_q.sum(dim=-1, keepdim=True)
-        active_mask = sum_q > 1e-6
+        # Truth scores are evidence, not a categorical distribution. Smooth logic
+        # produces small positive scores even for unmatched rules. Normalizing
+        # those scores makes a one-action ruleset certain in every state.
+        floor = self.logic_confidence_floor if hasattr(module, "prednames") else None
+        evidence = (mapped_q if floor is None else
+                    ((mapped_q.clamp(0, 1) - floor) / (1 - floor)).clamp_min(0))
+        sum_q = evidence.sum(dim=-1, keepdim=True)
+        confidence = ((sum_q > 1e-6).to(mapped_q.dtype) if floor is None else
+                      evidence.max(dim=-1, keepdim=True).values)
+        active_mask = confidence > 1e-6
+        if getattr(self, "_capture_experts", False):
+            self._last_logic_active = active_mask.detach()
 
         if "withhold" in action_names:
             default_probs = torch.zeros_like(mapped_q)
@@ -166,8 +172,8 @@ class BlenderActor(nn.Module):
         else:
             default_probs = torch.full_like(mapped_q, 1.0 / len(action_names))
 
-        normalized_q = torch.where(active_mask, mapped_q / torch.clamp(sum_q, min=1e-6), default_probs)
-        return normalized_q
+        normalized_q = evidence / sum_q.clamp_min(1e-6)
+        return confidence * normalized_q + (1 - confidence) * default_probs
 
     def get_explanation(self, neural_state, logic_state, action):
         """
@@ -188,7 +194,10 @@ class BlenderActor(nn.Module):
             if m_type == "neural":
                 probs = module.get_action_probs(neural_state)
             elif m_type == "logic":
+                self._last_logic_active = None
                 probs = self._map_logic_output(module.get_action_probs(logic_state), module)
+                if getattr(self, "_capture_experts", False) and self._last_logic_active is not None:
+                    self._logic_coverage[i] = self._last_logic_active
             else:
                 # Custom / plugin submodule (e.g. CEW or other continuous/relational modules)
                 sub_inp = (
@@ -205,6 +214,9 @@ class BlenderActor(nn.Module):
                 else:
                     probs = module(sub_inp)
             module_probs.append(probs)
+
+        if getattr(self, "_capture_experts", False):
+            self._expert_probs = torch.stack(module_probs, dim=1).detach()
 
         # weights size: B * N_modules
         weights = self.to_blender_policy_distribution(neural_state, logic_state)
@@ -230,10 +242,9 @@ class BlenderActor(nn.Module):
         dummy_neural = torch.zeros(logic_state.size(0), n_in).to(logic_state.device)
         weights = self.to_blender_policy_distribution(dummy_neural, logic_state)
 
-        # Zero out neural modules and re-normalize
-        for i, m_type in enumerate(self.module_types):
-            if m_type == "neural":
-                weights[:, i] = 0.0
+        # Mask without mutating softmax output, which autograd needs intact.
+        mask = weights.new_tensor([0.0 if kind == "neural" else 1.0 for kind in self.module_types])
+        weights = weights * mask
 
         weights_sum = weights.sum(dim=1, keepdim=True)
         weights = weights / torch.clamp(weights_sum, min=1e-12)
@@ -265,7 +276,7 @@ class BlenderActor(nn.Module):
 
         return action_probs, weights
 
-    def compute_action_probs_neural(self, neural_state):
+    def compute_action_probs_neural(self, neural_state, logic_state=None):
         """
         Compute action probabilities using only neural modules.
         """
@@ -275,12 +286,10 @@ class BlenderActor(nn.Module):
             l_in = self.blender.network[0].in_features
 
         dummy_logic = torch.zeros(neural_state.size(0), l_in).to(neural_state.device)
-        weights = self.to_blender_policy_distribution(neural_state, dummy_logic)
+        weights = self.to_blender_policy_distribution(neural_state, logic_state if logic_state is not None else dummy_logic)
 
-        # Zero out logic modules and re-normalize
-        for i, m_type in enumerate(self.module_types):
-            if m_type != "neural":
-                weights[:, i] = 0.0
+        mask = weights.new_tensor([1.0 if kind == "neural" else 0.0 for kind in self.module_types])
+        weights = weights * mask
 
         weights_sum = weights.sum(dim=1, keepdim=True)
         weights = weights / torch.clamp(weights_sum, min=1e-12)
@@ -298,7 +307,7 @@ class BlenderActor(nn.Module):
         """
         Merge policies using the blender function.
         """
-        if self.blender_mode == "logic":
+        if self.blender_mode in ("logic", "symbolic"):
             policy_probs = self.blender(logic_state)
             batch_size = policy_probs.size(0)
             mode_probs = []
@@ -317,11 +326,14 @@ class BlenderActor(nn.Module):
             logits = torch.logit(probs, eps=0.01)
         else:
             # Neural blender
-            if len(neural_state.shape) == 2:  # vector
-                logits = self.blender(logic_state)
+            if callable(getattr(self.blender, "get_action_probs", None)):
+                probs = self.blender.get_action_probs(neural_state)
+                logits = torch.log(probs.clamp_min(1e-12))
             else:
                 logits = self.blender(neural_state)
 
+        if getattr(self, "_capture_experts", False):
+            self._soft_gate = torch.softmax(logits, dim=1).detach()
         if self.blend_function == "softmax":
             return torch.softmax(logits, dim=1)
         else:
@@ -333,20 +345,30 @@ class BlenderActor(nn.Module):
         elif self.actor_mode == "logic":
             return self.compute_action_probs_logic(logic_state)
         else:
-            return self.compute_action_probs_neural(neural_state)
+            return self.compute_action_probs_neural(neural_state, logic_state)
 
     def get_q_values(self, neural_state, logic_state=None):
         """Compute Q-values by blending Q-values from all modules."""
         if logic_state is None:
             if neural_state.ndim == 2:
-                logic_state = neural_state.unsqueeze(1).repeat(1, 2, 1)
+                raise ValueError("BlendRL needs a model-built symbolic observation for vector Q-value inputs.")
             else:
                 logic_state = neural_state
         batch_size = neural_state.size(0)
         module_q_values = []
+        active = [
+            (self.actor_mode != "neural" or kind == "neural")
+            and (self.actor_mode != "logic" or kind != "neural")
+            for kind in self.module_types
+        ]
+        if not any(active):
+            raise ValueError(f"Actor mode {self.actor_mode!r} has no compatible policy modules.")
 
         for i, module in enumerate(self.policy_modules):
             m_type = self.module_types[i]
+            if not active[i]:
+                module_q_values.append(neural_state.new_zeros(batch_size, self.env.n_actions))
+                continue
             if m_type == "neural":
                 if hasattr(module, "get_q_values"):
                     try:
@@ -385,6 +407,9 @@ class BlenderActor(nn.Module):
             module_q_values.append(q)
 
         weights = self.to_blender_policy_distribution(neural_state, logic_state)
+        if self.actor_mode != "hybrid":
+            weights = weights * weights.new_tensor(active)
+            weights = weights / weights.sum(dim=1, keepdim=True).clamp_min(1e-12)
 
         q_values = torch.zeros(batch_size, self.env.n_actions, device=neural_state.device)
         for i, m_q in enumerate(module_q_values):
@@ -403,30 +428,71 @@ def build_blender_module(
     explain=False,
     out_size=2,
     architecture="cnn",
+    blender_model=None,
 ):
+    if blender_mode == "symbolic":
+        blender_mode = "logic"
     assert blender_mode in ["logic", "neural"]
+    blender_model_name = None
+    if isinstance(blender_model, str):
+        blender_model_name = blender_model
+    elif isinstance(blender_model, dict) or hasattr(blender_model, "items"):
+        model_spec = dict(blender_model)
+        blender_model_name = (
+            model_spec.get("name")
+            or model_spec.get("architecture")
+            or model_spec.get("type")
+        )
+
     if blender_mode == "logic":
-        if reasoner == "nsfr":
-            from nsfr.common import get_blender_nsfr_model
+        selected_reasoner = blender_model_name or reasoner
+        model_params = dict(blender_model) if hasattr(blender_model, "items") else {}
+        selected_rules = model_params.get("rules", blender_rules)
+        if selected_reasoner == "nsfr":
+            from src.app.core.provider_loader import provider_object
+            get_blender_nsfr_model = provider_object('nsfr', 'common.py:get_blender_nsfr_model')
 
-            return get_blender_nsfr_model(env.name, blender_rules, device, train=train, explain=explain)
-        elif reasoner == "neumann":
-            from neumann.common import get_blender_neumann_model, get_neumann_model
+            return get_blender_nsfr_model(env.name, selected_rules, device, train=train, explain=explain)
+        elif selected_reasoner == "neumann":
+            from src.app.core.provider_loader import provider_object
+            get_blender_neumann_model = provider_object('neumann', 'common.py:get_blender_neumann_model')
+            get_neumann_model = provider_object('neumann', 'common.py:get_neumann_model')
 
-            return get_blender_neumann_model(env.name, blender_rules, device, train=train, explain=explain)
-    if blender_mode == "neural":
-        from src.usr.models.neural.architectures import NatureCNNActor, StandardMLPActor
+            return get_blender_neumann_model(env.name, selected_rules, device, train=train, explain=explain)
+        if blender_model is not None:
+            from src.app.core.model_registry import build_model
 
-        if architecture == "cnn":
-            net = NatureCNNActor(out_size=out_size)
-        else:
             obs = env.reset()
             if isinstance(obs, tuple):
                 obs = obs[0]
-            num_in_features = np.prod(obs.shape[1:])
-            net = StandardMLPActor(num_in_features=num_in_features, out_size=out_size)
-        net.to(device)
-        return net
+            return build_model(
+                blender_model,
+                env=env,
+                device=device,
+                n_actions=out_size,
+                obs_dim=int(np.prod(obs.shape[1:])),
+            )
+
+    if blender_mode == "neural":
+        if blender_model is not None:
+            from src.app.core.model_registry import build_model
+
+            obs = env.reset()
+            if isinstance(obs, tuple):
+                obs = obs[0]
+            return build_model(
+                blender_model,
+                env=env,
+                device=device,
+                n_actions=out_size,
+                obs_dim=int(np.prod(obs.shape[1:])),
+            )
+        obs = env.reset()
+        if isinstance(obs, tuple):
+            obs = obs[0]
+        return _build_neural_agent(env.name, out_size, device,
+                                   arch_name="nature_cnn" if architecture == "cnn" else "dnn",
+                                   num_in_features=int(np.prod(obs.shape[1:])))
 
 
 @register_model("blendrl", "blender")
@@ -444,7 +510,7 @@ class BlenderActorCritic(nn.Module):
             ModelSlot(
                 name="neural",
                 required=True,
-                default="dnn",
+                default="basics/dnn",
                 tags=["neural", "actor"],
                 description="Neural policy/critic actor",
             ),
@@ -459,8 +525,48 @@ class BlenderActorCritic(nn.Module):
 
     def get_routing_weights(self, obs, logic_obs=None):
         if hasattr(self, "actor") and hasattr(self.actor, "to_blender_policy_distribution"):
+            if logic_obs is None:
+                logic_obs = self.build_logic_observation(obs)
             return self.actor.to_blender_policy_distribution(obs, logic_obs)
         return None
+
+    monitoring_namespace = "blend"
+
+    def monitoring_metadata(self):
+        return {"module_types": np.asarray(self.module_types, dtype=str)}
+
+    @torch.no_grad()
+    def collect_monitoring(self, obs):
+        """Summarize routing on an explicitly provided observation batch."""
+        from ..monitoring import routing_metrics
+
+        logic_obs = self.build_logic_observation(obs)
+        self.actor._capture_experts = True
+        self.actor._expert_probs = None
+        self.actor._logic_coverage = {}
+        try:
+            _, weights = self.actor(obs, logic_obs)
+            probs = self.actor._expert_probs
+            metrics = routing_metrics(weights, self.module_types, expert_probs=probs)
+            for i, active in self.actor._logic_coverage.items():
+                metrics[f"blend/logic_{i}/coverage"] = active.float().mean().item()
+            if self.blend_function == "gumbel_softmax" and self.actor.actor_mode == "hybrid":
+                gate = routing_metrics(self.actor._soft_gate, self.module_types)
+                metrics.update({key.replace("blend/", "blend/soft_gate/", 1): value
+                                for key, value in gate.items()})
+            return metrics, {"states": obs.detach(), "weights": weights.detach()}
+        finally:
+            self.actor._capture_experts = False
+            self.actor._expert_probs = None
+            self.actor._logic_coverage = {}
+
+    def validate_engine_compatibility(self, engine, algorithm):
+        if engine != "sb3":
+            return
+        if self.blend_function != "softmax":
+            raise ValueError("BlendRL with SB3 currently requires blend_function=softmax.")
+        if self.get_cfg("blend_ent_coef") not in (None, 0, 0.0):
+            raise ValueError("BlendRL with SB3 does not yet support blend entropy auxiliary losses.")
 
     def clone_topology_to(self, target) -> None:
         """Sync topology-changing policy modules into this plugin's target model."""
@@ -485,8 +591,16 @@ class BlenderActorCritic(nn.Module):
         self, base_lr: float, weight_decay: float = 0.0, cfg: Any = None
     ) -> list[dict[str, Any]]:
         groups = []
-        logic_lr = float(self.get_cfg("logic_lr", base_lr))
-        blender_lr = float(self.get_cfg("blender_lr", base_lr))
+        def rate(name):
+            value = self.get_cfg(name)
+            # Null model defaults leave legacy agent-level values effective.
+            if value is None:
+                agent = self.cfg.get("agent", {}) if hasattr(self.cfg, "get") else {}
+                value = agent.get(name) if hasattr(agent, "get") else None
+            return base_lr if value is None else float(value)
+
+        logic_lr = rate("logic_lr")
+        blender_lr = rate("blender_lr")
         used_ids = set()
 
         if hasattr(self, "actor") and hasattr(self.actor, "policy_modules"):
@@ -561,9 +675,16 @@ class BlenderActorCritic(nn.Module):
 
         if blender_cfg is not None:
             self.blender_mode = _get_val(blender_cfg, "mode", self.blender_mode)
-            self.blend_function = _get_val(blender_cfg, "blend_function", self.blend_function)
+            if self.blender_mode == "symbolic":
+                self.blender_mode = "logic"
+            self.blender_model = _get_val(blender_cfg, "model", None) or None
+            self.blend_function = self.get_cfg(
+                "blend_function", _get_val(blender_cfg, "blend_function", self.blend_function)
+            )
             blender_reasoner = _get_val(blender_cfg, "reasoner", self.reasoner or "nsfr")
         else:
+            self.blender_model = None
+            self.blend_function = self.get_cfg("blend_function", self.blend_function)
             blender_reasoner = self.reasoner or "nsfr"
 
         if modules_list is None and (symbolic_cfg is not None or neural_cfg is not None):
@@ -604,7 +725,8 @@ class BlenderActorCritic(nn.Module):
                 if m_type == "nsfr" or m_type == "neumann":
                     m_rules = _get_val(m_cfg, "rules", self.get_cfg("rules", "default"))
                     if self.reasoner == "neumann" or m_type == "neumann":
-                        from neumann.common import get_neumann_model
+                        from src.app.core.provider_loader import provider_object
+                        get_neumann_model = provider_object('neumann', 'common.py:get_neumann_model')
 
                         m = get_neumann_model(env.name, m_rules, device=device, train=True, explain=self.explain)
                     else:
@@ -638,6 +760,8 @@ class BlenderActorCritic(nn.Module):
                         arch_name=arch,
                         hidden_sizes=m_hidden,
                         num_in_features=neural_in_features,
+                        model_options={k: v for k, v in dict(m_cfg).items()
+                                       if k not in {"type", "name", "architecture", "module_type", "hidden_sizes"}},
                     )
                     self.policy_modules.append(m)
                     self.module_types.append("neural")
@@ -667,7 +791,8 @@ class BlenderActorCritic(nn.Module):
             # Add Logic modules
             for r in rulesets:
                 if self.reasoner == "neumann":
-                    from neumann.common import get_neumann_model
+                    from src.app.core.provider_loader import provider_object
+                    get_neumann_model = provider_object('neumann', 'common.py:get_neumann_model')
 
                     la = get_neumann_model(env.name, r, device=device, train=True, explain=self.explain)
                 else:
@@ -691,11 +816,16 @@ class BlenderActorCritic(nn.Module):
             explain=self.explain,
             out_size=out_size,
             architecture=self.architecture if self.architecture else "cnn",
+            blender_model=self.blender_model,
         )
 
         # Load logic critic (MLP)
-        mlp_module_path = f"in/envs/{env.name}/mlp.py"
-        if os.path.exists(mlp_module_path):
+        from src.app.core.provider_loader import environment_resource
+        try:
+            mlp_module_path = environment_resource(env.name, "mlp.py")
+        except FileNotFoundError:
+            mlp_module_path = None
+        if mlp_module_path is not None:
             module = load_module(mlp_module_path)
             mlp_cls = getattr(module, "StandardMLP", getattr(module, "MLP", None))
             if mlp_cls:
@@ -721,6 +851,9 @@ class BlenderActorCritic(nn.Module):
             self.blender_mode,
             self.blend_function,
             device=device,
+            # Checkpoints predating this setting retain their action mapping.
+            # Newly composed component profiles explicitly enable calibration.
+            logic_confidence_floor=self.get_cfg("logic_confidence_floor", None),
         )
 
     def get_cfg(self, key, default=None):
@@ -770,9 +903,22 @@ class BlenderActorCritic(nn.Module):
     def forward(self, neural_state, logic_state=None, action=None):
         return self.get_action_and_value(neural_state, logic_state, action=action)
 
+    def build_logic_observation(self, neural_state):
+        """Consume symbolic states; expert, gate and critic construction stay here."""
+        if self.actor_mode == "neural" and self.blender_mode == "neural":
+            return neural_state
+        if getattr(self, "_symbolic_state_loader", None) is None:
+            from src.app.core.data_loaders import create_state_loader
+            self._symbolic_state_loader = create_state_loader(self.cfg)
+        return self._symbolic_state_loader(neural_state)
+
+    def get_action_probs(self, neural_state):
+        logic_state = self.build_logic_observation(neural_state)
+        return self.actor(neural_state, logic_state)[0]
+
     def get_action_and_value(self, neural_state, logic_state=None, action=None):
-        if logic_state is None and neural_state.ndim == 2:
-            logic_state = neural_state.unsqueeze(1).repeat(1, 2, 1)
+        if logic_state is None:
+            logic_state = self.build_logic_observation(neural_state)
         action_probs, blending_weights = self.actor(neural_state, logic_state)
         dist = Categorical(action_probs)
         blend_dist = Categorical(blending_weights)
@@ -794,6 +940,8 @@ class BlenderActorCritic(nn.Module):
         )
 
     def get_q_values(self, neural_state, logic_state=None):
+        if logic_state is None:
+            logic_state = self.build_logic_observation(neural_state)
         if self.get_cfg("blend_q_values", True):
             return self.actor.get_q_values(neural_state, logic_state)
         # Legacy fallback if blend_q_values is explicitly False
@@ -809,12 +957,17 @@ class BlenderActorCritic(nn.Module):
                     return module(neural_state)
         return self.actor.get_q_values(neural_state, logic_state)
 
-    def get_value(self, neural_state, logic_state, blending_weights=None):
+    def get_value(self, neural_state, logic_state=None, blending_weights=None):
+        if logic_state is None:
+            logic_state = self.build_logic_observation(neural_state)
         if blending_weights is None:
             _, blending_weights = self.actor(neural_state, logic_state)
 
         neural_value = self.get_neural_value(neural_state).squeeze(1)
-        logic_value = self.get_logic_value(logic_state).squeeze(1)
+        # A missing symbolic critic must not turn the gate into a value scale.
+        # Share the available state critic until a dedicated one is provided.
+        logic_value = (self.get_logic_value(logic_state).squeeze(1)
+                       if self.logic_critic is not None and self.actor_mode != "neural" else neural_value)
 
         # Weighted value blending
         # w_neural_sum * V_neural + w_logic_sum * V_logic

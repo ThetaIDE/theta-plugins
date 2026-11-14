@@ -19,7 +19,7 @@ except ImportError:
     except ImportError:
         _CallbackBase = object
 
-from src.usr.models.cew.cew_model import CEWModel
+from .cew_model import CEWModel
 
 
 class CEWSelfOrganizationCallback(_CallbackBase):

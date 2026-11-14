@@ -29,11 +29,6 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 
 # Add root directory to path to allow importing src modules
-PROJECT_ROOT = str(Path(__file__).resolve().parents[4])
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-if os.path.join(PROJECT_ROOT, "src") not in sys.path:
-    sys.path.insert(0, os.path.join(PROJECT_ROOT, "src"))
 
 # ---------------------------------------------------------------------------
 #  Helpers
@@ -41,9 +36,9 @@ if os.path.join(PROJECT_ROOT, "src") not in sys.path:
 # ---------------------------------------------------------------------------
 #  Method Styling — imported from plot.base
 # ---------------------------------------------------------------------------
-from plot.base import clean_label
-from plot.base import get_style as get_method_style
-from src.usr.eval.early_prediction.model import (
+from src.app.core.plotting.base import clean_label
+from src.app.core.plotting.base import get_style as get_method_style
+from .model import (
     SepsisLSTM,
     SepsisTransformer,
     compute_volatility_features,
@@ -191,7 +186,7 @@ def load_policy_agent(ckpt_path, device):
     torch.serialization.add_safe_globals([getattr(sys.modules.get("omegaconf.dictconfig", None), "DictConfig", None)])
 
     try:
-        from src.usr.algorithms.agent_registry import get_agent_class
+        from src.app.core.agent_registry import get_agent_class
         agent_cls = get_agent_class("cql")
 
         agent = agent_cls.load_from_checkpoint(str(ckpt_path), map_location=device, weights_only=False)
@@ -497,7 +492,7 @@ def plot_ep_shock_over_tau(ep_shock_results, report_dir):
         ("Non-Shock Cohort (y=0)", "non_shock", "ep_shock_over_tau_non_shock.png"),
     ]
 
-    from plot.base import QUALITATIVE_PALETTE
+    from src.app.core.plotting.base import QUALITATIVE_PALETTE
 
     all_colors = list(QUALITATIVE_PALETTE) + [
         "tab:brown",

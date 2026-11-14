@@ -44,3 +44,10 @@ ENV/
 !envs/gym_classic_control/config/env/
 !envs/gym_classic_control/config/env/gym_classic_control/
 !envs/gym_classic_control/config/env/gym_classic_control/*.yaml
+
+# Native packaged environment profiles and resources.
+!**/profiles/env/
+!**/profiles/env/**
+
+!**/configs/env/
+!**/configs/env/**

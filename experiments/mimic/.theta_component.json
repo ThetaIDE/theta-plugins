@@ -2,13 +2,12 @@
   "id": "mimic",
   "name": "MIMIC Clinical Sepsis Benchmark",
   "kind": "experiment",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Complete MIMIC-III sepsis experiment suite: offline clinical benchmark configs, group defaults, ICU environment hooks, timeseries data module, early prediction & reward shaping evaluators, and clinical agreement plotters.",
   "author": {
     "name": "Theta Research"
   },
   "created_at": "2026-10-18T00:00:00Z",
-  "target_path": "in/config/experiment/mimic",
   "compatibility": {
     "theta": ">=2.0.0"
   },
@@ -20,7 +19,76 @@
     "components": [
       "thetalib",
       "d3rlpy-suite",
-      "dueling_resnet"
-    ]
-  }
+      "dueling_resnet",
+      "mimic-env",
+      "reward-shaping",
+      "blendrl"
+    ],
+    "pip": []
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [],
+  "payload": {
+    "implementations": [],
+    "resources": [
+      "resources/rules"
+    ],
+    "configs": {
+      "in/config/experiment/mimic/_base.yaml": "configs/experiment/mimic/_base.yaml",
+      "in/config/experiment/mimic/all_mimic.yaml": "configs/experiment/mimic/all_mimic.yaml",
+      "in/config/experiment/mimic/cql_benchmark.yaml": "configs/experiment/mimic/cql_benchmark.yaml",
+      "in/config/experiment/mimic/cql_literature.yaml": "configs/experiment/mimic/cql_literature.yaml",
+      "in/config/experiment/mimic/final.yaml": "configs/experiment/mimic/final.yaml",
+      "in/config/experiment/mimic/final_pos5_cql005.yaml": "configs/experiment/mimic/final_pos5_cql005.yaml",
+      "in/config/experiment/mimic/final_pos_weight_5.yaml": "configs/experiment/mimic/final_pos_weight_5.yaml",
+      "in/config/experiment/mimic/methods/cql_blendrl_cew_dueling_resnet.yaml": "configs/experiment/mimic/methods/cql_blendrl_cew_dueling_resnet.yaml",
+      "in/config/experiment/mimic/methods/cql_blendrl_cross_attention.yaml": "configs/experiment/mimic/methods/cql_blendrl_cross_attention.yaml",
+      "in/config/experiment/mimic/methods/cql_blendrl_human_cew.yaml": "configs/experiment/mimic/methods/cql_blendrl_human_cew.yaml",
+      "in/config/experiment/mimic/methods/cql_blendrl_human_continuous.yaml": "configs/experiment/mimic/methods/cql_blendrl_human_continuous.yaml",
+      "in/config/experiment/mimic/methods/cql_blendrl_human_dueling_resnet_continuous.yaml": "configs/experiment/mimic/methods/cql_blendrl_human_dueling_resnet_continuous.yaml",
+      "in/config/experiment/mimic/methods/cql_blendrl_human_dueling_resnet_rigid.yaml": "configs/experiment/mimic/methods/cql_blendrl_human_dueling_resnet_rigid.yaml",
+      "in/config/experiment/mimic/methods/cql_blendrl_human_neural.yaml": "configs/experiment/mimic/methods/cql_blendrl_human_neural.yaml",
+      "in/config/experiment/mimic/methods/cql_blendrl_human_rigid.yaml": "configs/experiment/mimic/methods/cql_blendrl_human_rigid.yaml",
+      "in/config/experiment/mimic/methods/cql_dnn.yaml": "configs/experiment/mimic/methods/cql_dnn.yaml",
+      "in/config/experiment/mimic/methods/cql_dueling_resnet.yaml": "configs/experiment/mimic/methods/cql_dueling_resnet.yaml",
+      "in/config/experiment/mimic/methods/cql_transformer.yaml": "configs/experiment/mimic/methods/cql_transformer.yaml",
+      "in/config/experiment/mimic/mimic_gpu_test.yaml": "configs/experiment/mimic/mimic_gpu_test.yaml",
+      "in/config/experiment/mimic/mimic_test.yaml": "configs/experiment/mimic/mimic_test.yaml",
+      "in/config/experiment/mimic/quick_test.yaml": "configs/experiment/mimic/quick_test.yaml",
+      "in/config/experiment/mimic/reciprocal_refinement.yaml": "configs/experiment/mimic/reciprocal_refinement.yaml",
+      "in/config/experiment/mimic/selected_mimic.yaml": "configs/experiment/mimic/selected_mimic.yaml",
+      "in/config/experiment/mimic/tune_mimic_all.yaml": "configs/experiment/mimic/tune_mimic_all.yaml",
+      "in/config/workflow/sepsis_reciprocal.yaml": "configs/workflow/sepsis_reciprocal.yaml"
+    }
+  },
+  "config_paths": [
+    "in/config/experiment/mimic/_base.yaml",
+    "in/config/experiment/mimic/all_mimic.yaml",
+    "in/config/experiment/mimic/cql_benchmark.yaml",
+    "in/config/experiment/mimic/cql_literature.yaml",
+    "in/config/experiment/mimic/final.yaml",
+    "in/config/experiment/mimic/final_pos5_cql005.yaml",
+    "in/config/experiment/mimic/final_pos_weight_5.yaml",
+    "in/config/experiment/mimic/methods/cql_blendrl_cew_dueling_resnet.yaml",
+    "in/config/experiment/mimic/methods/cql_blendrl_cross_attention.yaml",
+    "in/config/experiment/mimic/methods/cql_blendrl_human_cew.yaml",
+    "in/config/experiment/mimic/methods/cql_blendrl_human_continuous.yaml",
+    "in/config/experiment/mimic/methods/cql_blendrl_human_dueling_resnet_continuous.yaml",
+    "in/config/experiment/mimic/methods/cql_blendrl_human_dueling_resnet_rigid.yaml",
+    "in/config/experiment/mimic/methods/cql_blendrl_human_neural.yaml",
+    "in/config/experiment/mimic/methods/cql_blendrl_human_rigid.yaml",
+    "in/config/experiment/mimic/methods/cql_dnn.yaml",
+    "in/config/experiment/mimic/methods/cql_dueling_resnet.yaml",
+    "in/config/experiment/mimic/methods/cql_transformer.yaml",
+    "in/config/experiment/mimic/mimic_gpu_test.yaml",
+    "in/config/experiment/mimic/mimic_test.yaml",
+    "in/config/experiment/mimic/quick_test.yaml",
+    "in/config/experiment/mimic/reciprocal_refinement.yaml",
+    "in/config/experiment/mimic/selected_mimic.yaml",
+    "in/config/experiment/mimic/tune_mimic_all.yaml",
+    "in/config/workflow/sepsis_reciprocal.yaml"
+  ],
+  "config_path": "in/config/experiment/mimic/_base.yaml",
+  "rules_root": "resources/rules"
 }

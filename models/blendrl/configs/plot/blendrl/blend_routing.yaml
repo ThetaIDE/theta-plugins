@@ -1,0 +1,7 @@
+output_subdir: blend_routing
+figsize: [8, 5]
+dpi: 150
+smoothing_window: 1
+x_axis: transitions
+authority_threshold: 0.9
+tsne: false

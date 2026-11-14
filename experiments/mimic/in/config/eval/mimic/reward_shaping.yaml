@@ -1,8 +1,0 @@
-# Default Tier 1 configuration profile for Potential-Based Reward Shaping Evaluator
-evaluator: reward-shaping
-lambda_coef: 1.0
-gamma: 0.99
-window_hours: 12
-use_volatility: true
-ep_ckpt_dir: "results/checkpoints/early_prediction"
-ep_architecture: null

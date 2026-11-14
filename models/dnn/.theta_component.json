@@ -2,12 +2,11 @@
   "id": "dnn",
   "name": "Deep Neural Network (MLP)",
   "kind": "model",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "description": "Standard Multi-Layer Perceptron (DNN) wrapping PyTorch Linear, LayerNorm, and Dueling Q-value heads.",
   "author": {
     "name": "Theta-IDE Team"
   },
-  "target_path": "src/usr/models/dnn",
   "config_path": "in/config/model/basics/dnn.yaml",
   "config_paths": [
     "in/config/model/basics/dnn.yaml"
@@ -38,7 +37,42 @@
           "leaky_relu",
           "identity"
         ]
+      },
+      "shared_features": {
+        "type": "boolean",
+        "default": true,
+        "description": "Share policy/value features. Disable for independent PPO actor and critic networks."
+      },
+      "dueling": {
+        "type": "boolean",
+        "description": "Use dueling Q-value heads; defaults to enabled for widths >=128."
       }
+    }
+  },
+  "dependencies": {
+    "components": [],
+    "pip": []
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "dnn",
+      "kind": "model",
+      "entry_point": "dnn_model.py:DNNModel",
+      "aliases": [
+        "basics/dnn"
+      ]
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "__init__.py",
+      "dnn_model.py"
+    ],
+    "resources": [],
+    "configs": {
+      "in/config/model/basics/dnn.yaml": "configs/model/basics/dnn.yaml"
     }
   }
 }

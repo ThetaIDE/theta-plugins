@@ -1,0 +1,11 @@
+name: atari/seaquest
+monitor_metric: "eval/reward"
+offline_only: false
+preprocess_on_load: false
+env_id: "ALE/Seaquest-v5"
+num_envs: 8
+num_steps: 128
+gamma: 0.99
+gae_lambda: 0.95
+
+default_plots: [convergence, losses, reports]

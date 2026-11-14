@@ -1,22 +1,31 @@
 import os
 
-from neumann.message_passing import MessagePassingModule
-from neumann.neumann import NEUMANN
-from neumann.reasoning_graph import ReasoningGraphModule
-from neumann.soft_logic import SoftLogic
-from nsfr.facts_converter import FactsConverter
-from nsfr.utils.logic import build_infer_module, get_blender_lang, get_lang
-from nsfr.valuation import ValuationModule
+from src.app.services.rulesets import resolve_ruleset
+from src.app.workspace import WorkspacePaths
+
+from .message_passing import MessagePassingModule
+from .neumann import NEUMANN
+from .reasoning_graph import ReasoningGraphModule
+from .soft_logic import SoftLogic
+from src.app.core.provider_loader import provider_object
+FactsConverter = provider_object('nsfr', 'facts_converter.py:FactsConverter')
+from src.app.core.provider_loader import provider_object
+build_infer_module = provider_object('nsfr', 'utils/logic.py:build_infer_module')
+get_blender_lang = provider_object('nsfr', 'utils/logic.py:get_blender_lang')
+get_lang = provider_object('nsfr', 'utils/logic.py:get_lang')
+from src.app.core.provider_loader import provider_object
+ValuationModule = provider_object('nsfr', 'valuation.py:ValuationModule')
 
 
 def get_neumann_model(env_name: str, rules: str, device: str, train=True, explain=False):
     current_path = os.path.dirname(__file__)
     lark_path = os.path.join(current_path, 'lark/exp.lark')
-    lang_base_path = f"in/rules/{env_name}/"
+    resource = resolve_ruleset(WorkspacePaths.for_process().root, env_name, rules)
+    lang_base_path = str(resource.directory.parent) + "/"
 
-    lang, clauses, bk, atoms = get_lang(lark_path, lang_base_path, rules)
+    lang, clauses, bk, atoms = get_lang(lark_path, lang_base_path, resource.name)
 
-    val_fn_path = f"in/envs/{env_name}/valuation.py"
+    val_fn_path = str(resource.valuation_path)
     val_module = ValuationModule(val_fn_path, lang, device)
 
     # FC = FactsConverter(lang=lang, valuation_module=val_module, atoms=atoms, bk=bk, device=device)
@@ -36,14 +45,15 @@ def get_neumann_model(env_name: str, rules: str, device: str, train=True, explai
     return neumann
 
 
-def get_blender_neumann_model(env_name: str, rules: str, device: str, train=False, mode='normal'):
+def get_blender_neumann_model(env_name: str, rules: str, device: str, train=False, mode='normal', explain=False):
     current_path = os.path.dirname(__file__)
     lark_path = os.path.join(current_path, 'lark/exp.lark')
-    lang_base_path = f"in/rules/{env_name}/"
+    resource = resolve_ruleset(WorkspacePaths.for_process().root, env_name, rules)
+    lang_base_path = str(resource.directory.parent) + "/"
 
-    lang, clauses, bk, atoms = get_blender_lang(lark_path, lang_base_path, rules)
+    lang, clauses, bk, atoms = get_blender_lang(lark_path, lang_base_path, resource.name)
 
-    val_fn_path = f"in/envs/{env_name}/valuation.py"
+    val_fn_path = str(resource.valuation_path)
     val_module = ValuationModule(val_fn_path, lang, device)
 
     FC = FactsConverter(lang=lang, valuation_module=val_module, device=device)

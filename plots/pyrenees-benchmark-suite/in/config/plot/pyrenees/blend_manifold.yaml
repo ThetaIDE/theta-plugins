@@ -1,5 +1,0 @@
-# Latent state space manifold visualization with policy decisions
-method: pca
-n_components: 2
-figsize: [8, 6]
-dpi: 300

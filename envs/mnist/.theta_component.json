@@ -2,7 +2,7 @@
   "id": "mnist",
   "name": "MNIST Handwritten Digits",
   "kind": "env",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Handwritten digits classification benchmark (8x8 mini-MNIST and 28x28 MNIST) supporting supervised, unsupervised, and RL environments.",
   "author": {
     "name": "Theta-IDE Team"
@@ -19,18 +19,18 @@
     "supervised",
     "unsupervised"
   ],
-  "target_path": "in/envs/mnist",
-  "config_path": "in/config/env/mnist.yaml",
+  "config_path": "in/config/env/mnist/digits.yaml",
   "config_paths": [
-    "in/config/env/mnist.yaml",
-    "in/config/env/digits.yaml"
+    "in/config/env/mnist/digits.yaml",
+    "in/config/env/mnist/mnist.yaml"
   ],
   "dependencies": {
     "pip": [
       "scikit-learn",
       "numpy",
       "torch"
-    ]
+    ],
+    "components": []
   },
   "parameter_schema": {
     "type": "object",
@@ -112,6 +112,34 @@
           }
         }
       }
+    }
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "mnist",
+      "kind": "env",
+      "entry_point": "env_vectorized.py:VectorizedEnv",
+      "aliases": [
+        "mnist/mnist",
+        "mnist/digits",
+        "digits"
+      ],
+      "resource_root": "."
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "env_vectorized.py",
+      "__init__.py"
+    ],
+    "resources": [
+      "requirements.txt"
+    ],
+    "configs": {
+      "in/config/env/mnist/digits.yaml": "configs/env/mnist/digits.yaml",
+      "in/config/env/mnist/mnist.yaml": "configs/env/mnist/mnist.yaml"
     }
   }
 }

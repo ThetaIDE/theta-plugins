@@ -7,9 +7,9 @@ from typing import Any, Dict, Union
 import torch
 from torch import nn
 
-from nsfr.fol.language import Language
-from nsfr.fol.logic import Atom, Const
-from nsfr.utils.common import load_module
+from .fol.language import Language
+from .fol.logic import Atom, Const
+from .utils.common import load_module
 
 
 class ValuationFunction(nn.Module, ABC):

@@ -1,0 +1,6 @@
+name: mlp_classifier
+type: mlp_classifier
+hidden_dims: [64, 32]
+activation: relu
+dropout: 0.1
+lightning_module: MLPClassifierLightningModule

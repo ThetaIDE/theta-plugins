@@ -2,7 +2,7 @@
   "id": "theta-validation-suite",
   "name": "Theta Validation Suite",
   "kind": "suite",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Online-RL experiment and component conformance recipes for ThetaIDE Basics.",
   "author": {
     "name": "Theta-IDE Team"
@@ -18,25 +18,26 @@
   "dependencies": {
     "components": [
       "basic_suite"
-    ]
+    ],
+    "pip": []
   },
   "paradigms": [
     "online_rl"
   ],
   "config_paths": [
     "in/config/experiment/theta_validation/_base.yaml",
-    "in/config/experiment/theta_validation/success/online_smoke.yaml",
-    "in/config/experiment/theta_validation/failure/missing_method.yaml",
-    "in/config/experiment/theta_validation/failure/missing_agent.yaml",
-    "in/config/experiment/theta_validation/failure/missing_model.yaml",
+    "in/config/experiment/theta_validation/failure/checkpoint_conflict.yaml",
+    "in/config/experiment/theta_validation/failure/incompatible_bc.yaml",
     "in/config/experiment/theta_validation/failure/incompatible_cql.yaml",
     "in/config/experiment/theta_validation/failure/incompatible_iql.yaml",
     "in/config/experiment/theta_validation/failure/incompatible_td3_bc.yaml",
-    "in/config/experiment/theta_validation/failure/incompatible_bc.yaml",
-    "in/config/experiment/theta_validation/failure/unknown_agent.yaml",
-    "in/config/experiment/theta_validation/failure/checkpoint_conflict.yaml",
     "in/config/experiment/theta_validation/failure/invalid_checkpoint_value.yaml",
-    "in/config/experiment/theta_validation/failure/malformed_telemetry_metrics.yaml"
+    "in/config/experiment/theta_validation/failure/malformed_telemetry_metrics.yaml",
+    "in/config/experiment/theta_validation/failure/missing_agent.yaml",
+    "in/config/experiment/theta_validation/failure/missing_method.yaml",
+    "in/config/experiment/theta_validation/failure/missing_model.yaml",
+    "in/config/experiment/theta_validation/failure/unknown_agent.yaml",
+    "in/config/experiment/theta_validation/success/online_smoke.yaml"
   ],
   "test_suite": {
     "format": "theta.test-suite/v1",
@@ -59,7 +60,7 @@
         "description": "PPO must retain its runner entrypoint, algorithm identity, and online-RL capability declaration.",
         "config_path": "in/config/agent/sb3/ppo.yaml",
         "required": {
-          "entrypoint": "src/usr/algorithms/sb3-suite/sb3_runner.py",
+          "entrypoint": "package://sb3-suite/sb3_runner.py",
           "algorithm": "PPO",
           "compatible_paradigms": [
             "online_rl"
@@ -72,7 +73,7 @@
         "description": "CQL must retain its runner entrypoint, algorithm identity, and offline-RL capability declaration.",
         "config_path": "in/config/agent/d3rlpy/cql.yaml",
         "required": {
-          "entrypoint": "src/usr/algorithms/d3rlpy-suite/d3rlpy_runner.py",
+          "entrypoint": "package://d3rlpy-suite/d3rlpy_runner.py",
           "algorithm": "CQL",
           "compatible_paradigms": [
             "offline_rl"
@@ -219,5 +220,28 @@
         "expected_error": "telemetry.metrics' must be a list"
       }
     ]
-  }
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [],
+  "payload": {
+    "implementations": [],
+    "resources": [],
+    "configs": {
+      "in/config/experiment/theta_validation/_base.yaml": "configs/experiment/theta_validation/_base.yaml",
+      "in/config/experiment/theta_validation/failure/checkpoint_conflict.yaml": "configs/experiment/theta_validation/failure/checkpoint_conflict.yaml",
+      "in/config/experiment/theta_validation/failure/incompatible_bc.yaml": "configs/experiment/theta_validation/failure/incompatible_bc.yaml",
+      "in/config/experiment/theta_validation/failure/incompatible_cql.yaml": "configs/experiment/theta_validation/failure/incompatible_cql.yaml",
+      "in/config/experiment/theta_validation/failure/incompatible_iql.yaml": "configs/experiment/theta_validation/failure/incompatible_iql.yaml",
+      "in/config/experiment/theta_validation/failure/incompatible_td3_bc.yaml": "configs/experiment/theta_validation/failure/incompatible_td3_bc.yaml",
+      "in/config/experiment/theta_validation/failure/invalid_checkpoint_value.yaml": "configs/experiment/theta_validation/failure/invalid_checkpoint_value.yaml",
+      "in/config/experiment/theta_validation/failure/malformed_telemetry_metrics.yaml": "configs/experiment/theta_validation/failure/malformed_telemetry_metrics.yaml",
+      "in/config/experiment/theta_validation/failure/missing_agent.yaml": "configs/experiment/theta_validation/failure/missing_agent.yaml",
+      "in/config/experiment/theta_validation/failure/missing_method.yaml": "configs/experiment/theta_validation/failure/missing_method.yaml",
+      "in/config/experiment/theta_validation/failure/missing_model.yaml": "configs/experiment/theta_validation/failure/missing_model.yaml",
+      "in/config/experiment/theta_validation/failure/unknown_agent.yaml": "configs/experiment/theta_validation/failure/unknown_agent.yaml",
+      "in/config/experiment/theta_validation/success/online_smoke.yaml": "configs/experiment/theta_validation/success/online_smoke.yaml"
+    }
+  },
+  "config_path": "in/config/experiment/theta_validation/_base.yaml"
 }

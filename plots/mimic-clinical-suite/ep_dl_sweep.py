@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional
 
 import matplotlib.pyplot as plt
 
-from plot.base import BasePlotter, get_style
+from src.app.core.plotting.base import BasePlotter, get_style
 
 DISP_MAP = {
     "lstm_no_v": "LSTM (no V)",

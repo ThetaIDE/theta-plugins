@@ -2,7 +2,8 @@ from typing import Any
 
 try:
     import torch as th
-    from nsfr.utils.common import bool_to_probs
+    from src.app.core.provider_loader import provider_object
+    bool_to_probs = provider_object('nsfr', 'utils/common.py:bool_to_probs')
 except ImportError:
     th = None
     def bool_to_probs(x):

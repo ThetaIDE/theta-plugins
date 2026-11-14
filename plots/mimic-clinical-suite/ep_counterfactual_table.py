@@ -2,9 +2,10 @@
 from pathlib import Path
 from typing import Optional
 
-from plot.base import BasePlotter
-from plot.ep_cache import get_ep_eval_data
-from src.usr.eval.early_prediction.eval_logic import write_counterfactual_table
+from src.app.core.plotting.base import BasePlotter
+from .ep_cache import get_ep_eval_data
+from src.app.core.provider_loader import provider_object
+write_counterfactual_table = provider_object('mimic-early-prediction', 'eval_logic.py:write_counterfactual_table')
 
 
 class EpCounterfactualTablePlotter(BasePlotter):

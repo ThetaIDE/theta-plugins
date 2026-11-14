@@ -2,7 +2,7 @@
   "id": "blendrl",
   "name": "BlendRL Neural-Symbolic Policy",
   "kind": "model",
-  "version": "1.0.3",
+  "version": "1.2.1",
   "description": "Modular actor-critic architecture combining neural networks and symbolic reasoners with adaptive blending.",
   "author": {
     "name": "NeSyRL Contributors",
@@ -18,17 +18,23 @@
     "logic",
     "rl"
   ],
-  "target_path": "src/usr/models/blendrl",
   "dependencies": {
     "components": [
       "dnn",
       "nsfr",
       "neumann"
+    ],
+    "pip": [
+      "captum",
+      "lark"
     ]
   },
   "config_path": "in/config/model/blendrl.yaml",
   "config_paths": [
-    "in/config/model/blendrl.yaml"
+    "in/config/model/blendrl.yaml",
+    "in/config/plot/blendrl/blend_routing.yaml",
+    "in/config/data/blendrl/symbolic_state.yaml",
+    "in/config/data/blendrl/cartpole_state.yaml"
   ],
   "compatibility": {
     "theta": ">=2.0.0"
@@ -46,34 +52,47 @@
       },
       "blender": {
         "type": "object",
+        "required": [
+          "mode"
+        ],
         "properties": {
           "mode": {
             "type": "string",
             "enum": [
-              "logic",
-              "neural"
-            ]
+              "neural",
+              "symbolic"
+            ],
+            "x-theta-hide-label": true
           },
-          "blend_function": {
-            "type": "string",
-            "enum": [
-              "softmax",
-              "gumbel_softmax"
-            ]
+          "model": {
+            "type": "object",
+            "x-theta-domain": "model",
+            "description": "Model used to produce blender weights."
           }
         }
+      },
+      "blend_function": {
+        "type": "string",
+        "enum": [
+          "softmax",
+          "gumbel_softmax"
+        ],
+        "description": "Blending function. SB3 currently requires softmax."
       },
       "blend_q_values": {
         "type": "boolean"
       },
       "blend_ent_coef": {
-        "type": "number"
+        "type": "number",
+        "description": "Blend entropy coefficient. SB3 currently requires zero or null."
       },
       "logic_lr": {
-        "type": "number"
+        "type": "number",
+        "description": "Logic optimizer learning rate; null inherits the agent learning rate."
       },
       "blender_lr": {
-        "type": "number"
+        "type": "number",
+        "description": "Blender optimizer learning rate; null inherits the agent learning rate."
       },
       "neural": {
         "type": "string",
@@ -84,7 +103,219 @@
         "type": "string",
         "x-theta-domain": "model",
         "description": "Symbolic reasoning module."
+      },
+      "monitoring_interval": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "SB3 environment steps between routing summaries; 0 disables."
+      },
+      "monitoring_max_samples": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "Maximum recent observations to save for routing plots; 0 disables."
+      },
+      "logic_confidence_floor": {
+        "type": [
+          "number",
+          "null"
+        ],
+        "minimum": 0,
+        "exclusiveMaximum": 1,
+        "description": "Truth scores at or below this floor abstain; stronger evidence blends with the default action distribution. Null preserves legacy normalization for historical checkpoints."
       }
+    },
+    "x-theta-config-schemas": {
+      "in/config/plot/blendrl/blend_routing.yaml": {
+        "type": "object",
+        "properties": {
+          "output_subdir": {
+            "type": "string"
+          },
+          "figsize": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "dpi": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "smoothing_window": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "x_axis": {
+            "type": "string"
+          },
+          "authority_threshold": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 1
+          },
+          "tsne": {
+            "type": "boolean"
+          }
+        }
+      },
+      "in/config/data/blendrl/symbolic_state.yaml": {
+        "type": "object",
+        "properties": {
+          "object_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "default": 1
+          },
+          "feature_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "default": null
+          },
+          "builder": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          }
+        },
+        "additionalProperties": false
+      },
+      "in/config/data/blendrl/cartpole_state.yaml": {
+        "type": "object",
+        "properties": {
+          "object_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "default": 1
+          },
+          "feature_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "default": null
+          },
+          "builder": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "blendrl",
+      "kind": "model",
+      "entry_point": "agents/blender_agent.py:BlenderActorCritic",
+      "aliases": [
+        "blender"
+      ],
+      "input_requirements": [
+        {
+          "slot": "symbolic_state_loader",
+          "contract": "symbolic_state/v1",
+          "when": {
+            "actor_mode": [
+              "hybrid",
+              "logic"
+            ]
+          }
+        },
+        {
+          "slot": "symbolic_state_loader",
+          "contract": "symbolic_state/v1",
+          "when": {
+            "blender.mode": [
+              "symbolic",
+              "logic"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "blend_routing",
+      "kind": "plotter",
+      "entry_point": "plot/blendrl/routing.py:BlendRoutingPlotter",
+      "aliases": []
+    },
+    {
+      "id": "blendrl_symbolic_state",
+      "kind": "datamodule",
+      "role": "symbolic_state",
+      "entry_point": "symbolic_state.py:SymbolicStateLoader",
+      "output_contracts": [
+        "symbolic_state/v1"
+      ],
+      "paradigms": [
+        "online_rl",
+        "offline_rl"
+      ],
+      "parameter_schema": {
+        "type": "object",
+        "properties": {
+          "object_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "default": 1
+          },
+          "feature_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "default": null
+          },
+          "builder": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "monitoring.py",
+      "__init__.py",
+      "agents/blender_agent.py",
+      "agents/__init__.py",
+      "plot/blendrl/__init__.py",
+      "plot/blendrl/routing.py",
+      "symbolic_state.py"
+    ],
+    "resources": [],
+    "configs": {
+      "in/config/model/blendrl.yaml": "configs/model/blendrl.yaml",
+      "in/config/plot/blendrl/blend_routing.yaml": "configs/plot/blendrl/blend_routing.yaml",
+      "in/config/data/blendrl/symbolic_state.yaml": "configs/data/blendrl/symbolic_state.yaml",
+      "in/config/data/blendrl/cartpole_state.yaml": "configs/data/blendrl/cartpole_state.yaml"
     }
   }
 }

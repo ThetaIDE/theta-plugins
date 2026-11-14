@@ -2,7 +2,7 @@
   "id": "robotics_suite",
   "name": "Robotics Suite",
   "kind": "suite",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A ready-to-use Theta-IDE robotics group with MuJoCo robot tasks, PPO and SAC baselines, MLP policies, and standard training plots.",
   "author": {
     "name": "Theta-IDE Team"
@@ -10,9 +10,19 @@
   "dependencies": {
     "components": [
       "robotics"
-    ]
+    ],
+    "pip": []
   },
   "compatibility": {
     "theta": ">=2.0.0"
-  }
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [],
+  "payload": {
+    "implementations": [],
+    "resources": [],
+    "configs": {}
+  },
+  "config_paths": []
 }

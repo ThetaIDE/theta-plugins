@@ -1,4 +1,0 @@
-# Neumann Neural Symbolic Reasoner
-reasoner: neumann
-rules: default
-logic_type: continuous

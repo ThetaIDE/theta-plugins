@@ -2,7 +2,7 @@
   "id": "cew",
   "name": "Clinical Expert Weighting (CEW)",
   "kind": "model",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "installed_from": "https://raw.githubusercontent.com/CameronEgb/theta-hub/main/packages/cew-1.0.0.zip",
   "sha256": "3db5d37219a88e614ff52a8a6cbd5bcee4fa956462311f5325ca6d4e43397043",
   "config_path": "in/config/model/cew.yaml",
@@ -22,5 +22,31 @@
   },
   "config_paths": [
     "in/config/model/cew.yaml"
-  ]
+  ],
+  "dependencies": {
+    "components": [],
+    "pip": []
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "cew",
+      "kind": "model",
+      "entry_point": "cew_model.py:CEWModel",
+      "aliases": []
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "__init__.py",
+      "cew_model.py",
+      "cew_utils.py",
+      "cew_callback.py"
+    ],
+    "resources": [],
+    "configs": {
+      "in/config/model/cew.yaml": "configs/model/cew.yaml"
+    }
+  }
 }

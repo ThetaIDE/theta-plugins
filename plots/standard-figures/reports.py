@@ -2,10 +2,6 @@ import os
 import sys
 from pathlib import Path
 
-# Ensure project root is in sys.path
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
 
 import argparse
 import json
@@ -14,7 +10,7 @@ from typing import Optional
 import pandas as pd
 import yaml
 
-from plot.base import BasePlotter, clean_label, get_method_aliases
+from src.app.core.plotting.base import BasePlotter, clean_label, get_method_aliases
 
 
 def format_duration(seconds: float) -> str:

@@ -2,7 +2,7 @@
   "id": "doom-env",
   "name": "ViZDoom Environment",
   "kind": "env",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "ViZDoom visual reinforcement learning environment for Doom scenario benchmarks.",
   "author": {
     "name": "ViZDoom Team"
@@ -15,7 +15,6 @@
     "reinforcement-learning",
     "visual"
   ],
-  "target_path": "in/envs/doom",
   "config_path": "in/config/env/doom.yaml",
   "dependencies": {
     "components": [
@@ -68,5 +67,31 @@
   },
   "config_paths": [
     "in/config/env/doom.yaml"
-  ]
+  ],
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "doom-env",
+      "kind": "env",
+      "entry_point": "env_vectorized.py:VectorizedNudgeEnv",
+      "aliases": [
+        "doom"
+      ],
+      "resource_root": "."
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "env_vectorized.py",
+      "env.py",
+      "actions.py",
+      "mlp.py",
+      "valuation.py"
+    ],
+    "resources": [],
+    "configs": {
+      "in/config/env/doom.yaml": "configs/env/doom.yaml"
+    }
+  }
 }

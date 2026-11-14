@@ -2,13 +2,12 @@
   "id": "mimic-clinical-suite",
   "name": "MIMIC Clinical Evaluation & Visualization Suite",
   "kind": "plotter",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Clinical policy alignment, septic shock trajectory counterfactuals, and clinician agreement visualizers.",
   "author": {
     "name": "Theta Clinical Team"
   },
   "created_at": "2026-10-18T00:00:00Z",
-  "target_path": "plot/mimic_clinical_suite",
   "compatibility": {
     "theta": ">=2.0.0"
   },
@@ -17,12 +16,12 @@
     "offline_rl"
   ],
   "config_paths": [
-    "in/config/plot/mimic/clinical_alignment.yaml",
     "in/config/plot/mimic/clinical.yaml",
+    "in/config/plot/mimic/clinical_alignment.yaml",
     "in/config/plot/mimic/ep_agreement.yaml",
-    "in/config/plot/mimic/ep_trajectories.yaml",
     "in/config/plot/mimic/ep_counterfactual_table.yaml",
-    "in/config/plot/mimic/ep_dl_sweep.yaml"
+    "in/config/plot/mimic/ep_dl_sweep.yaml",
+    "in/config/plot/mimic/ep_trajectories.yaml"
   ],
   "parameter_schema": {
     "type": "object",
@@ -155,5 +154,73 @@
         }
       }
     }
-  }
+  },
+  "dependencies": {
+    "components": [
+      "mimic-early-prediction"
+    ],
+    "pip": []
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "clinical",
+      "kind": "plotter",
+      "entry_point": "clinical.py:ClinicalPlotter",
+      "aliases": []
+    },
+    {
+      "id": "clinical_alignment",
+      "kind": "plotter",
+      "entry_point": "clinical_alignment.py:ClinicalAlignmentPlotter",
+      "aliases": []
+    },
+    {
+      "id": "ep_agreement",
+      "kind": "plotter",
+      "entry_point": "ep_agreement.py:EpAgreementPlotter",
+      "aliases": []
+    },
+    {
+      "id": "ep_counterfactual_table",
+      "kind": "plotter",
+      "entry_point": "ep_counterfactual_table.py:EpCounterfactualTablePlotter",
+      "aliases": []
+    },
+    {
+      "id": "ep_dl_sweep",
+      "kind": "plotter",
+      "entry_point": "ep_dl_sweep.py:EpDlSweepPlotter",
+      "aliases": []
+    },
+    {
+      "id": "ep_trajectories",
+      "kind": "plotter",
+      "entry_point": "ep_trajectories.py:EpTrajectoriesPlotter",
+      "aliases": []
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "clinical.py",
+      "ep_cache.py",
+      "ep_agreement.py",
+      "ep_trajectories.py",
+      "ep_counterfactual_table.py",
+      "__init__.py",
+      "clinical_alignment.py",
+      "ep_dl_sweep.py"
+    ],
+    "resources": [],
+    "configs": {
+      "in/config/plot/mimic/clinical.yaml": "configs/plot/mimic/clinical.yaml",
+      "in/config/plot/mimic/clinical_alignment.yaml": "configs/plot/mimic/clinical_alignment.yaml",
+      "in/config/plot/mimic/ep_agreement.yaml": "configs/plot/mimic/ep_agreement.yaml",
+      "in/config/plot/mimic/ep_counterfactual_table.yaml": "configs/plot/mimic/ep_counterfactual_table.yaml",
+      "in/config/plot/mimic/ep_dl_sweep.yaml": "configs/plot/mimic/ep_dl_sweep.yaml",
+      "in/config/plot/mimic/ep_trajectories.yaml": "configs/plot/mimic/ep_trajectories.yaml"
+    }
+  },
+  "config_path": "in/config/plot/mimic/clinical.yaml"
 }

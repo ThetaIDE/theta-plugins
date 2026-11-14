@@ -44,7 +44,8 @@ class VectorizedEnv(VectorizedBaseEnv):
         screen_size: int = 84,
         **kwargs,
     ):
-        super().__init__(mode)
+        super().__init__()
+        self.mode = mode
         self.n_envs = max(1, int(n_envs))
         self.name = name or "atari"
 

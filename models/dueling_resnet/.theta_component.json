@@ -2,12 +2,11 @@
   "id": "dueling_resnet",
   "name": "Dueling ResNet",
   "kind": "model",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Scaled residual policy and Q-network architecture with LayerNorm, GELU, and Dueling decomposition.",
   "author": {
     "name": "Theta-IDE Team"
   },
-  "target_path": "src/usr/models/dueling_resnet",
   "config_path": "in/config/model/basics/dueling_resnet.yaml",
   "config_paths": [
     "in/config/model/basics/dueling_resnet.yaml"
@@ -26,6 +25,33 @@
           "type": "integer"
         }
       }
+    }
+  },
+  "dependencies": {
+    "components": [],
+    "pip": []
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "dueling_resnet",
+      "kind": "model",
+      "entry_point": "dueling_resnet_model.py:DuelingResNetMLP",
+      "aliases": [
+        "resnet",
+        "basics/dueling_resnet"
+      ]
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "__init__.py",
+      "dueling_resnet_model.py"
+    ],
+    "resources": [],
+    "configs": {
+      "in/config/model/basics/dueling_resnet.yaml": "configs/model/basics/dueling_resnet.yaml"
     }
   }
 }

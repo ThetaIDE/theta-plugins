@@ -1,6 +1,0 @@
-administer(X):-low_bp(X).
-administer(X):-high_lactate(X).
-administer(X):-high_creatinine(X).
-administer(X):-high_bilirubin(X).
-administer(X):-low_platelets(X).
-withhold(X):-true(E).

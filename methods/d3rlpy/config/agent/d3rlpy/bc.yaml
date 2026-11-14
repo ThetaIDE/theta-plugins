@@ -1,7 +1,0 @@
-name: d3rlpy/bc
-compatible_paradigms: [offline_rl]
-entrypoint: src/usr/algorithms/d3rlpy-suite/d3rlpy_runner.py
-algorithm: BC
-learning_rate: 1e-3
-batch_size: 256
-n_steps: 25000

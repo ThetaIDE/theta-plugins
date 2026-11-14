@@ -1,4 +1,0 @@
-# Authority allocation between neural and symbolic policies across state space
-enabled: true
-figsize: [9, 5]
-dpi: 300

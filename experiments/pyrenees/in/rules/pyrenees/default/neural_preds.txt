@@ -1,7 +1,0 @@
-low_competency:1:oagent
-med_competency:1:oagent
-high_competency:1:oagent
-last_was_ps:1:oagent
-last_was_we:1:oagent
-last_was_fwe:1:oagent
-true:1:oenv

@@ -1,6 +1,0 @@
-logic_agent(X):-low_bp(E),high_lactate(E).
-logic_agent(X):-high_creatinine(E).
-logic_agent(X):-high_bilirubin(E).
-logic_agent(X):-low_platelets(E).
-logic_agent(X):-normal_bp(E),normal_lactate(E),normal_organs(E).
-neural_agent(X):-true(E).

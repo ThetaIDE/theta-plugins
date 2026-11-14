@@ -1,64 +1,102 @@
 # Theta Plugins & Components
 
-Standalone source repository for plugins and modular environments authored for [Theta-IDE](https://github.com/CameronEgb/Theta-IDE) and distributed through the [Theta Community Hub](https://github.com/CameronEgb/theta-hub).
+Maintained research providers, environments, model architectures, data modules,
+evaluators, plots, application extensions, experiment profiles and dependency
+suites for Theta-IDE. The IDE separately ships its generic framework, four base
+paradigms and bundled providers.
 
-> **Note on Architecture**: The `Theta-IDE` repository intentionally ships with **zero** bundled community plugins and only one core plugin (`documentation`). All community plugins are maintained independently in this repository and installed on-demand by users via the Community Hub.
+All 37 maintained packages use native manifests: `storage_version: 2`,
+`api_version: 1`, explicit capabilities, package-relative entry points, resources,
+config mappings and dependencies. The authoritative record is each package's
+`.theta_component.json`. App packages also retain `plugin.json` for panel IDs,
+settings and default activation. A source folder need not mirror its installation
+location.
 
----
+## Build locally
 
-## 📦 Components in This Repository
+Use the sibling IDE's Python environment and shared validation:
 
-### 1. UI Plugins (`plugins/`)
-* **`obsidian/` (Obsidian Notes)**: Embedded Obsidian vault browser, research markdown notebook, daily logs, and experiment run reference linking.
-* **`doom-sim/` (DOOM Simulator Panel)**: Authentic 1993 id Software DOOM engine interactive web renderer running directly inside the IDE.
-* **`antigravity/` (Antigravity Agent)**: Interactive AI pair programming and assistant panel integrated into Theta-IDE.
-
-### 2. Environments (`envs/`)
-* **`doom-env/` (DOOM RL Environment)**: Vectorized Gymnasium-compatible environment for tactical 2.5D Doom reinforcement learning with custom valuation and action discretization.
-
----
-
-## 🛠️ Repository Structure
-
-```
-theta-plugins/
-├── plugins/
-│   ├── obsidian/          # Obsidian markdown vault browser
-│   │   ├── plugin.json
-│   │   ├── __init__.py
-│   │   ├── panel.py
-│   │   └── obsidian.svg
-│   ├── doom-sim/          # Doom simulation panel
-│   │   ├── plugin.json
-│   │   ├── __init__.py
-│   │   ├── panel.py
-│   │   ├── doom.html
-│   │   └── doom.svg
-│   └── antigravity/       # Antigravity agent assistant
-│       ├── plugin.json
-│       ├── __init__.py
-│       ├── panel.py
-│       └── antigravity.svg
-├── envs/
-│   └── doom-env/          # Doom RL environment & wrappers
-│       ├── env.py
-│       ├── env_vectorized.py
-│       ├── actions.py
-│       ├── mlp.py
-│       ├── valuation.py
-│       └── doom.yaml
-└── scripts/
-    └── package_plugins.py # Packaging helper to build zips with SHA-256
+```sh
+../Theta-IDE/venv/bin/python scripts/package_plugins.py --validate-only
+../Theta-IDE/venv/bin/python scripts/package_plugins.py --output /tmp/theta-packages
+# Optional: --only dnn sb3-suite, or --ide-root /path/to/Theta-IDE
 ```
 
----
+The builder validates all maintained manifests, provider/config selectors,
+dependency ownership, cycles and versions before writing output. Archive names
+and versions come from source metadata. `index.json` preserves manifest fields
+and records each local archive's SHA-256. Archives contain declared payloads and
+runtime assets; development caches and duplicate embedded suite sources are
+excluded. Builds are deterministic for identical input bytes.
 
-## 🚀 Building & Packaging for Theta Hub
+This command only builds local artifacts. It never copies archives, rewrites a
+registry, publishes, or pushes to a Hub. The obsolete per-model `pyproject.toml`
+files that advertised historical `src.usr` entry points have been retired;
+maintained packages install through native archives. Third-party Python
+distribution entry points remain supported by the IDE.
 
-To compile release archives and verify SHA-256 hashes for `theta-hub`:
+## Install and edit
 
-```bash
-python scripts/package_plugins.py
+From Theta-IDE, choose the actual target workspace:
+
+```sh
+python -m src.app.components --root /path/to/workspace install /tmp/theta-packages/dnn-1.1.0.zip
+python -m src.app.components --root /path/to/workspace copy dnn my_dnn
+python -m src.app.components --root /path/to/workspace export my_dnn --out /tmp/my_dnn.zip
 ```
 
-This generates `.zip` archives ready to be published as GitHub Release assets or placed in `theta-hub/packages/`.
+Install component dependencies first when using local archives. The existing
+Hub dependency workflow is separate from local verification. `--no-dependencies`
+suppresses Python dependency installation; it still checks required component
+ownership. Installed packages go under `src/plugins/{components,app}/installed`,
+editable copies under `src/usr`, and active profiles under `in/config`.
+No workspace migration is required. Old archives/layouts are rejected rather
+than adapted or guessed. Existing user/installed implementations are never
+rewritten by source conversion.
+
+## Ownership decisions
+
+- DNN owns `dnn`; MLP owns `mlp` and `standard_mlp`. Their aliases no longer collide.
+- Thetalib and the basic/deep-learning/robotics suites compose independent
+  dependency packages. MIMIC profiles depend on independent environment, data,
+  evaluator and plotting packages instead of embedding copies.
+- `standard-figures` supplies profiles and depends on the IDE's bundled
+  `standard_figures`; it does not install duplicate plotter implementations.
+- BlendRL owns its routing plot. NSFR owns shared CartPole rules; NEUMANN depends
+  on NSFR. MIMIC owns its experiment rule assets.
+- `doom-sim` depends on `doom-env`. Activating the panel does not copy an
+  environment into the workspace. Panel identities remain `doom` and `obsidian`,
+  while package identities remain `doom-sim` and `obsidian-notes`.
+- Autoencoder and MLP classifier profiles explicitly select their package-owned
+  Lightning training components. SB3/d3rlpy runners resolve workspace/config
+  roots themselves; the generic worker supplies package context and leases.
+- SB3 algorithm capabilities declare `episode_outcomes: true` for objective/replicate planning; filenames do not establish that contract.
+- d3rlpy targets its 2.x API and requires an explicit transition dataset. It
+  reports unsupported algorithms/APIs rather than falling back to another
+  algorithm, synthesizing data, or silently omitting training.
+
+Use relative imports inside packages. Cross-package helpers use
+`src.app.core.provider_loader.provider_object`; resources use `package://ID/path`
+and the environment/rules APIs. Profiles live under `configs/<group>/...`, with
+workspace overrides taking precedence. Do not introduce source-depth calculations,
+`sys.path` provider roots, global import aliases or `in/envs`/`in/rules` references.
+
+## Verification
+
+```sh
+../Theta-IDE/venv/bin/python -m pytest tests/test_native_integration.py -q
+```
+
+The tests build the real archives and install them into disposable workspaces
+with separate state directories. They cover all declarations/imports, headless
+listing, provider ownership, resources/rules, all four paradigm workers,
+SB3/BlendRL checkpoints, editable copy/edit/export/reinstall/update/rollback,
+scaffolding, experiment exports, objective/tuner selection, Slurm generation and
+app-plugin identity/Obsidian activation. They never install into the IDE checkout.
+Tests use dependencies already present in the chosen Python environment; they do
+not download Python packages or publish artifacts. Full MIMIC experiments need
+external clinical datasets/checkpoints; Atari/MuJoCo need their runtime assets;
+interactive DOOM/Antigravity browser services are not exercised headlessly.
+
+See the IDE's `docs/PLUGIN_NATIVE_INTEGRATION.md` for package-by-package evidence
+and the scope of the retained, fixed API-1 forwarding modules.

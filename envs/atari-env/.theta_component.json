@@ -2,7 +2,7 @@
   "id": "atari-env",
   "name": "Atari 2600 Environment Suite",
   "kind": "env",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Standard Arcade Learning Environment (ALE) Atari 2600 benchmarks for Gymnasium.",
   "author": {
     "name": "Farama Foundation",
@@ -17,8 +17,7 @@
     "reinforcement-learning",
     "benchmark"
   ],
-  "target_path": "in/envs/atari",
-  "config_path": "in/config/env/atari.yaml",
+  "config_path": "in/config/env/atari/beam_rider.yaml",
   "dependencies": {
     "components": [
       "thetalib"
@@ -284,7 +283,6 @@
     }
   },
   "config_paths": [
-    "in/config/env/atari.yaml",
     "in/config/env/atari/beam_rider.yaml",
     "in/config/env/atari/breakout.yaml",
     "in/config/env/atari/mspacman.yaml",
@@ -292,5 +290,42 @@
     "in/config/env/atari/qbert.yaml",
     "in/config/env/atari/seaquest.yaml",
     "in/config/env/atari/space_invaders.yaml"
-  ]
+  ],
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "atari-env",
+      "kind": "env",
+      "entry_point": "env_vectorized.py:VectorizedEnv",
+      "aliases": [
+        "atari",
+        "atari/beam_rider",
+        "atari/breakout",
+        "atari/mspacman",
+        "atari/pong",
+        "atari/qbert",
+        "atari/seaquest",
+        "atari/space_invaders"
+      ],
+      "resource_root": "."
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "env_vectorized.py"
+    ],
+    "resources": [
+      "requirements.txt"
+    ],
+    "configs": {
+      "in/config/env/atari/beam_rider.yaml": "configs/env/atari/beam_rider.yaml",
+      "in/config/env/atari/breakout.yaml": "configs/env/atari/breakout.yaml",
+      "in/config/env/atari/mspacman.yaml": "configs/env/atari/mspacman.yaml",
+      "in/config/env/atari/pong.yaml": "configs/env/atari/pong.yaml",
+      "in/config/env/atari/qbert.yaml": "configs/env/atari/qbert.yaml",
+      "in/config/env/atari/seaquest.yaml": "configs/env/atari/seaquest.yaml",
+      "in/config/env/atari/space_invaders.yaml": "configs/env/atari/space_invaders.yaml"
+    }
+  }
 }

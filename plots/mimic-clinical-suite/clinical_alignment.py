@@ -18,13 +18,6 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# Ensure project root and src are in sys.path
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-src_path = os.path.join(PROJECT_ROOT, "src")
-if src_path not in sys.path:
-    sys.path.insert(0, src_path)
 
 import argparse
 
@@ -37,13 +30,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.metrics import average_precision_score, precision_recall_curve, roc_auc_score
 
-from plot.base import (
+from src.app.core.plotting.base import (
     BasePlotter,
     clean_label,
     get_canonical_method_name,
     get_method_aliases,
 )
-from plot.base import (
+from src.app.core.plotting.base import (
     get_style as get_method_style,
 )
 
@@ -169,7 +162,7 @@ class ClinicalAlignmentPlotter(BasePlotter):
         return method_ckpts, method_interval_ckpts
 
     def _load_agent(self, path, dev):
-        from src.usr.algorithms.agent_registry import AGENT_REGISTRY, auto_discover, get_agent_class
+        from src.app.core.agent_registry import AGENT_REGISTRY, auto_discover, get_agent_class
 
         auto_discover()
         candidates = []

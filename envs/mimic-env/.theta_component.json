@@ -2,20 +2,20 @@
   "id": "mimic-env",
   "name": "MIMIC-III Clinical Environment Suite",
   "kind": "env",
-  "version": "1.0.1",
-  "description": "ICU sepsis benchmarks, valuation hooks, clinical rules, and transition interfaces for MIMIC-III.",
+  "version": "1.0.2",
+  "description": "ICU sepsis benchmarks, valuation hooks, and transition interfaces for MIMIC-III.",
   "author": {
     "name": "Theta Clinical Team"
   },
   "created_at": "2026-10-18T00:00:00Z",
-  "target_path": "in/envs/mimic",
   "config_path": "in/config/env/mimic.yaml",
   "dependencies": {
     "components": [
       "clinical-timeseries-data",
       "mimic-early-prediction",
       "mimic-clinical-suite"
-    ]
+    ],
+    "pip": []
   },
   "paradigms": [
     "supervised",
@@ -81,5 +81,29 @@
   },
   "config_paths": [
     "in/config/env/mimic.yaml"
-  ]
+  ],
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "mimic-env",
+      "kind": "env",
+      "entry_point": "environment/env_vectorized.py:VectorizedNudgeEnv",
+      "aliases": [
+        "mimic"
+      ],
+      "resource_root": "environment"
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "environment/env_vectorized.py",
+      "environment/generate_expert.py",
+      "environment/valuation.py"
+    ],
+    "resources": [],
+    "configs": {
+      "in/config/env/mimic.yaml": "configs/env/mimic.yaml"
+    }
+  }
 }

@@ -1,7 +1,7 @@
 {
   "id": "obsidian",
   "name": "Obsidian Notes",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "description": "Embedded Obsidian markdown vault browser, research notebook, and NeSyRL experiment logger.",
   "author": "NeSyRL Team",
   "default_enabled": false,

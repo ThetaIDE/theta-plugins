@@ -1,4 +1,0 @@
-# Neural Symbolic Forward Reasoner
-reasoner: nsfr
-rules: default
-logic_type: continuous

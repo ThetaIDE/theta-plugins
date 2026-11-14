@@ -1,9 +1,0 @@
-name: d3rlpy/td3_bc
-compatible_paradigms: [offline_rl]
-entrypoint: src/usr/algorithms/d3rlpy-suite/d3rlpy_runner.py
-algorithm: TD3_BC
-learning_rate: 3e-4
-batch_size: 256
-n_steps: 50000
-alpha: 2.5
-gamma: 0.99

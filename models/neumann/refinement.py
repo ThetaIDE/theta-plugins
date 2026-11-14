@@ -1,9 +1,9 @@
 import itertools
 
-from fol.language import DataType
-from fol.logic import Atom, Clause, Const, FuncTerm, Var
-from fol.logic_ops import subs
-from logic_utils import get_all_vars_with_dtype, invalid_var_dtypes, is_tautology, true
+from .fol.language import DataType
+from .fol.logic import Atom, Clause, Const, FuncTerm, Var
+from .fol.logic_ops import subs
+from .logic_utils import get_all_vars_with_dtype, invalid_var_dtypes, is_tautology, true
 
 
 # TODOL refine_from_modeb, generate_by_refinement

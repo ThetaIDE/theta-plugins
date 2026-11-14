@@ -1,3 +1,0 @@
-# Dueling ResNet architecture
-hidden_sizes: [512, 512, 256, 128]
-architecture: dueling_resnet

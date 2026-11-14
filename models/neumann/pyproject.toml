@@ -1,8 +1,0 @@
-[project]
-name = "theta-model-neumann"
-version = "1.0.0"
-description = "NEUMANN Neuro-Symbolic Message Passing Reasoner for Theta-IDE"
-dependencies = ["torch>=2.0.0"]
-
-[project.entry-points."theta.models"]
-neumann = "src.usr.models.neumann.neumann:NEUMANN"

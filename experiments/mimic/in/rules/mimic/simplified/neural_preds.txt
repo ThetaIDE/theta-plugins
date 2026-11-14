@@ -1,6 +1,0 @@
-low_bp:1:oagent
-high_lactate:1:oagent
-high_creatinine:1:oagent
-high_bilirubin:1:oagent
-low_platelets:1:oagent
-true:1:oenv

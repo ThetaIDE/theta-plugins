@@ -1,0 +1,5 @@
+name: blendrl_symbolic_state
+role: symbolic_state
+object_count: 1
+feature_count: null
+builder: null

@@ -12,10 +12,6 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-# Ensure project root and src are in sys.path
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
 
 import matplotlib
 import numpy as np
@@ -24,7 +20,7 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from plot.base import BasePlotter, clean_label, get_style_info
+from src.app.core.plotting.base import BasePlotter, clean_label, get_style_info
 
 
 class ClinicalPlotter(BasePlotter):

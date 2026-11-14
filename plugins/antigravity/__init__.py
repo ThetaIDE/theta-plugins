@@ -21,10 +21,7 @@ from frontend.plugins.context import PluginContext
 
 import time
 
-try:
-    from .panel import AntigravityPanel
-except (ImportError, ValueError):
-    from frontend.plugins.antigravity.panel import AntigravityPanel
+from .panel import AntigravityPanel
 
 
 class SidepaneEventFilter(QObject):

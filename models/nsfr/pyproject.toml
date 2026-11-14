@@ -1,8 +1,0 @@
-[project]
-name = "theta-model-nsfr"
-version = "1.0.0"
-description = "Neural Symbolic Forward Reasoner for Theta-IDE"
-dependencies = ["torch>=2.0.0"]
-
-[project.entry-points."theta.models"]
-nsfr = "src.usr.models.nsfr.nsfr:NSFReasoner"

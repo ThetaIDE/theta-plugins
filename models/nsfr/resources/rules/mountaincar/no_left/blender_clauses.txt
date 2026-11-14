@@ -1,0 +1,2 @@
+logic_agent(X):-moving(E).
+neural_agent(X):-not_moving(E).

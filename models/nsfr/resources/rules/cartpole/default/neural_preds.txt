@@ -1,0 +1,7 @@
+leaning_left:1:oagent
+leaning_right:1:oagent
+moving_left:1:oagent
+moving_right:1:oagent
+is_stable:1:oenv
+not_stable:1:oenv
+true:1:oenv

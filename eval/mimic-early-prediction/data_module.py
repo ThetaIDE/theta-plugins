@@ -22,7 +22,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from src.app.core.interfaces import BaseDataModule
 from src.app.core.paradigm_loader import register_component
-from src.usr.eval.early_prediction.model import compute_volatility_features, normalize_features
+from .model import compute_volatility_features, normalize_features
 
 log = logging.getLogger(__name__)
 
@@ -151,7 +151,7 @@ class EPSepsisDataModule(L.LightningDataModule, BaseDataModule):
         _, self.input_dim = self.get_training_sequences()
 
     def _compute_cql_v_values(self, checkpoint: str) -> np.ndarray:
-        from src.usr.algorithms.agent_registry import get_agent_class
+        from src.app.core.agent_registry import get_agent_class
         agent_cls = get_agent_class("cql")
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -13,7 +15,8 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     return layer
 
 
-from src.usr.models.nature_cnn.nature_cnn_model import NatureCNNActor
+from src.app.core.provider_loader import provider_object
+NatureCNNActor = provider_object('nature_cnn', 'nature_cnn_model.py:NatureCNNActor')
 
 # Backward compatibility alias
 NeuralBlenderActor = NatureCNNActor
@@ -84,12 +87,15 @@ class ValueNetwork(nn.Module):
         return self.network(x / 255.0)
 
 
-@register_model("mlp", "dnn", "mlpqnetwork")
+@register_model("mlp", "mlpqnetwork")
 class MLPQNetwork(nn.Module):
-    def __init__(self, n_actions, num_in_features=4, hidden_sizes=[64, 64], dueling=None, activation=None, dropout=0.0):
+    def __init__(self, n_actions, num_in_features=4, hidden_sizes=[64, 64], dueling=None, activation=None, dropout=0.0,
+                 hidden_dims=None):
         super().__init__()
         self.n_actions = n_actions
         self.num_in_features = num_in_features
+        if hidden_dims is not None:
+            hidden_sizes = hidden_dims
         if hidden_sizes is None or len(hidden_sizes) == 0:
             hidden_sizes = [256, 256]
         else:
@@ -265,8 +271,6 @@ The registry's `dnn` is MLPQNetwork, an RL Q-network built around n_actions and
 a duelling head, so it is the wrong shape for a labelled dataset even though the
 name suggests otherwise. These are plain classifiers: features in, logits out.
 """
-
-from __future__ import annotations
 
 import torch
 import torch.nn as nn

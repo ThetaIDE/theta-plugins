@@ -1,0 +1,41 @@
+{
+  "id": "doom-sim",
+  "name": "DOOM",
+  "version": "1.0.1",
+  "description": "Authentic 1993 id Software DOOM engine running directly inside Theta IDE.",
+  "author": "Cameron Egbert",
+  "default_enabled": false,
+  "icon": "doom",
+  "entry_point": "DoomPlugin",
+  "kind": "plugin",
+  "dependencies": {
+    "components": [
+      "doom-env"
+    ],
+    "pip": [
+      "PyQt6",
+      "PyQt6-WebEngine"
+    ]
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "doom",
+      "kind": "plugin",
+      "entry_point": "__init__.py:DoomPlugin"
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "__init__.py",
+      "panel.py"
+    ],
+    "resources": [
+      "doom.svg",
+      "doom.html"
+    ],
+    "configs": {}
+  },
+  "config_paths": []
+}

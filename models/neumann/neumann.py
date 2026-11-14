@@ -1,19 +1,11 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import platform
-
-Batch = None
-Data = None
-if platform.system() != "Darwin":
-    try:
-        from torch_geometric.data import Batch, Data
-    except (ImportError, Exception):
-        pass
+from torch_geometric.data import Batch, Data
 
 from src.app.core.model_registry import register_model
-from neumann.logic_utils import add_true_atoms, get_index_by_predname, true
-from neumann.torch_utils import softor
+from .logic_utils import add_true_atoms, get_index_by_predname, true
+from .torch_utils import softor
 
 
 @register_model("neumann")

@@ -2,22 +2,17 @@
   "id": "robotics-mujoco",
   "name": "Gymnasium MuJoCo Robotics",
   "kind": "env",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Continuous-control robotics benchmarks from Gymnasium MuJoCo: Ant, HalfCheetah, Hopper, Walker2d, and Humanoid.",
   "author": {
     "name": "Theta-IDE Team"
   },
-  "config_paths": [
-    "in/config/env/mujoco/ant.yaml",
-    "in/config/env/mujoco/half_cheetah.yaml",
-    "in/config/env/mujoco/hopper.yaml",
-    "in/config/env/mujoco/walker2d.yaml",
-    "in/config/env/mujoco/humanoid.yaml"
-  ],
+  "config_paths": [],
   "dependencies": {
     "pip": [
       "gymnasium[mujoco]>=1.0.0"
-    ]
+    ],
+    "components": []
   },
   "compatibility": {
     "theta": ">=2.0.0"
@@ -25,7 +20,6 @@
   "paradigms": [
     "online_rl"
   ],
-  "target_path": "in/envs/mujoco",
   "parameter_schema": {
     "type": "object",
     "properties": {},
@@ -191,5 +185,32 @@
         }
       }
     }
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "robotics-mujoco",
+      "kind": "env",
+      "entry_point": "env_vectorized.py:VectorizedEnv",
+      "aliases": [
+        "mujoco",
+        "mujoco/ant",
+        "mujoco/humanoid",
+        "mujoco/hopper",
+        "mujoco/walker2d",
+        "mujoco/half_cheetah"
+      ],
+      "resource_root": "."
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "env_vectorized.py"
+    ],
+    "resources": [
+      "requirements.txt"
+    ],
+    "configs": {}
   }
 }

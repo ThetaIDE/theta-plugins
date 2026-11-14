@@ -1,0 +1,5 @@
+left:1:oagent
+right:1:oagent
+noop:1:oagent
+logic_agent:1:oenv
+neural_agent:1:oenv

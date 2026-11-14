@@ -1,0 +1,41 @@
+{
+  "id": "antigravity",
+  "name": "Antigravity Agent",
+  "version": "1.0.1",
+  "description": "Integrated Google Antigravity Agent for pair programming and codebase assistance with full-panel and sidepane modes.",
+  "author": "Antigravity Team",
+  "default_enabled": true,
+  "icon": "antigravity",
+  "entry_point": "AntigravityPlugin",
+  "extra": {
+    "has_settings": true
+  },
+  "kind": "plugin",
+  "dependencies": {
+    "components": [],
+    "pip": [
+      "PyQt6",
+      "PyQt6-WebEngine"
+    ]
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "antigravity",
+      "kind": "plugin",
+      "entry_point": "__init__.py:AntigravityPlugin"
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "__init__.py",
+      "panel.py"
+    ],
+    "resources": [
+      "antigravity.svg"
+    ],
+    "configs": {}
+  },
+  "config_paths": []
+}

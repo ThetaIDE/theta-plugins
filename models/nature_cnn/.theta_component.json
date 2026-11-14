@@ -2,12 +2,11 @@
   "id": "nature_cnn",
   "name": "Nature CNN",
   "kind": "model",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Canonical 3-stage convolutional neural network architecture (Mnih et al., 2015) for visual reinforcement learning.",
   "author": {
     "name": "Theta-IDE Team"
   },
-  "target_path": "src/usr/models/nature_cnn",
   "config_path": "in/config/model/basics/nature_cnn.yaml",
   "config_paths": [
     "in/config/model/basics/nature_cnn.yaml"
@@ -26,6 +25,35 @@
       "features_dim": {
         "type": "integer"
       }
+    }
+  },
+  "dependencies": {
+    "components": [],
+    "pip": []
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "nature_cnn",
+      "kind": "model",
+      "entry_point": "nature_cnn_model.py:NatureCNNActor",
+      "aliases": [
+        "nature_cnn_actor",
+        "cnn",
+        "cnn_actor",
+        "basics/nature_cnn"
+      ]
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "__init__.py",
+      "nature_cnn_model.py"
+    ],
+    "resources": [],
+    "configs": {
+      "in/config/model/basics/nature_cnn.yaml": "configs/model/basics/nature_cnn.yaml"
     }
   }
 }

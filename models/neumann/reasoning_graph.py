@@ -8,9 +8,11 @@ from joblib import Parallel, delayed
 from torch_geometric.utils import from_networkx
 from tqdm import tqdm
 
-from neumann.fol.logic import Clause, Conjunction
-from neumann.logic_utils import generate_substitutions
-from nsfr.fol.logic_ops import subs_list, unify
+from .fol.logic import Clause, Conjunction
+from .logic_utils import generate_substitutions
+from src.app.core.provider_loader import provider_object
+subs_list = provider_object('nsfr', 'fol/logic_ops.py:subs_list')
+unify = provider_object('nsfr', 'fol/logic_ops.py:unify')
 
 logger = logging.getLogger(__name__)
 

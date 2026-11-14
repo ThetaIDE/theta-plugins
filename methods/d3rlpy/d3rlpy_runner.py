@@ -12,19 +12,19 @@ import sys
 import time
 from pathlib import Path
 
-# Ensure project root is in sys.path
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
+from src.app.workspace import WorkspacePaths
 from src.app import telemetry
 
 
-@hydra.main(version_base=None, config_path="../../../in/config", config_name="config")
+@hydra.main(version_base=None, config_path=str(WorkspacePaths.for_process().primary_config), config_name="config")
 def main(cfg: DictConfig):
+    if os.environ.get("THETA_MANAGED_THREADS"):
+        import torch
+        torch.set_num_threads(int(os.environ["THETA_MANAGED_THREADS"]))
     try:
         import d3rlpy
     except ImportError:
@@ -79,54 +79,17 @@ def main(cfg: DictConfig):
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
     # Resolve dataset
-    dataset_path_val = cfg.get("dataset_path") or cfg.get("dataset")
-    if not dataset_path_val:
-        # Fallback to standard offline dataset directory
-        candidate_dir = Path("results/datasets") / group / exp_id
-        if candidate_dir.exists():
-            subdirs = [p for p in candidate_dir.iterdir() if p.is_dir()]
-            if subdirs:
-                dataset_path_val = str(subdirs[0])
-            else:
-                dataset_path_val = str(candidate_dir)
-
-    observations = []
-    actions = []
-    rewards = []
-    terminals = []
-
-    if dataset_path_val and Path(dataset_path_val).exists():
-        from src.app.dataset_utils import DatasetReader
-
-        reader = DatasetReader(dataset_path_val)
-        print(f"[d3rlpy Engine] Loading transitions from {dataset_path_val} ({len(reader)} items)...")
-        for i in range(len(reader)):
-            item = reader[i]
-            if isinstance(item, dict):
-                observations.append(item["obs"])
-                actions.append(item["action"])
-                rewards.append(item["reward"])
-                terminals.append(item.get("done", False))
-            elif isinstance(item, (list, tuple)) and len(item) >= 5:
-                observations.append(item[0])
-                actions.append(item[1])
-                rewards.append(item[2])
-                terminals.append(item[4])
-
-    if not observations:
-        print("[d3rlpy Engine] No offline dataset found; synthesizing bootstrap exploration buffer...")
-        # Create a small bootstrap buffer from the environment
-        test_env = gym.make(env_id)
-        obs, _ = test_env.reset(seed=int(cfg.get("seed", 42)))
-        for _ in range(min(1000, n_steps)):
-            act = test_env.action_space.sample()
-            next_obs, rew, term, trunc, _ = test_env.step(act)
-            observations.append(obs)
-            actions.append(act)
-            rewards.append(rew)
-            terminals.append(term or trunc)
-            obs = next_obs if not (term or trunc) else test_env.reset()[0]
-        test_env.close()
+    dataset_path_val = cfg.get("dataset_path")
+    if not dataset_path_val or not Path(dataset_path_val).is_dir():
+        raise ValueError("The offline runner requires an explicit transition dataset_path directory")
+    from src.app.dataset_utils import DatasetReader
+    reader = DatasetReader(dataset_path_val)
+    if not len(reader): raise ValueError(f"No transitions in {dataset_path_val}")
+    print(f"[d3rlpy Engine] Loading transitions from {dataset_path_val} ({len(reader)} items)...")
+    observations = reader.obs[:len(reader)].cpu().numpy()
+    actions = reader.actions[:len(reader)].cpu().numpy()
+    rewards = reader.rewards[:len(reader)].cpu().numpy()
+    terminals = reader.dones[:len(reader)].cpu().numpy()
 
     obs_arr = np.array(observations, dtype=np.float32)
     act_arr = np.array(actions)
@@ -134,34 +97,16 @@ def main(cfg: DictConfig):
     term_arr = np.array(terminals, dtype=bool)
 
     # Determine action type (discrete vs continuous)
-    is_discrete = np.issubdtype(act_arr.dtype, np.integer) or len(act_arr.shape) == 1
+    is_discrete = np.issubdtype(act_arr.dtype, np.integer)
     if is_discrete:
         act_arr = act_arr.astype(np.int64)
     else:
         act_arr = act_arr.astype(np.float32)
 
-    try:
-        # d3rlpy v2 dataset format
-        from d3rlpy.dataset import MDPDataset, ReplayBuffer, InfiniteBuffer
-        dataset = ReplayBuffer(
-            InfiniteBuffer(),
-            observations=obs_arr,
-            actions=act_arr,
-            rewards=rew_arr,
-            terminals=term_arr,
-        )
-    except Exception:
-        try:
-            from d3rlpy.dataset import MDPDataset
-            dataset = MDPDataset(
-                observations=obs_arr,
-                actions=act_arr,
-                rewards=rew_arr,
-                terminals=term_arr,
-                discrete_action=is_discrete,
-            )
-        except Exception:
-            dataset = None
+    from d3rlpy.dataset import MDPDataset
+    from d3rlpy.constants import ActionSpace
+    dataset = MDPDataset(observations=obs_arr, actions=act_arr, rewards=rew_arr,
+                         terminals=term_arr, action_space=ActionSpace.DISCRETE if is_discrete else ActionSpace.CONTINUOUS)
 
     # Algorithm selection
     algo = None
@@ -183,11 +128,7 @@ def main(cfg: DictConfig):
             algo = d3rlpy.algos.BCConfig(learning_rate=lr, batch_size=batch_size).create()
 
     if algo is None:
-        # Fallback to discrete or continuous CQL
-        if is_discrete and hasattr(d3rlpy.algos, "DiscreteCQLConfig"):
-            algo = d3rlpy.algos.DiscreteCQLConfig(learning_rate=lr, batch_size=batch_size).create()
-        elif hasattr(d3rlpy.algos, "CQLConfig"):
-            algo = d3rlpy.algos.CQLConfig(learning_rate=lr, batch_size=batch_size).create()
+        raise ValueError(f"d3rlpy does not provide the declared algorithm {algo_name!r} for this action space")
 
     start_time = time.time()
     status = "failed"
@@ -202,7 +143,7 @@ def main(cfg: DictConfig):
         while step < n_steps:
             steps_to_run = min(eval_freq, n_steps - step)
             if hasattr(algo, "fit") and dataset is not None:
-                algo.fit(dataset, n_steps=steps_to_run, show_progress=False)
+                algo.fit(dataset, n_steps=steps_to_run, n_steps_per_epoch=steps_to_run, show_progress=False)
             step += steps_to_run
 
             # Evaluate policy in environment
@@ -256,5 +197,13 @@ def main(cfg: DictConfig):
     print(f"Telemetry logged to: {logger.version_dir}")
 
 
-if __name__ == "__main__":
+def launch():
+    paths = WorkspacePaths.for_process()
+    search = [f"file://{p}" for p in paths.config_roots() if p.is_dir() and p != paths.primary_config]
+    if not any(arg.lstrip('+').startswith('hydra.searchpath=') for arg in sys.argv[1:]):
+        sys.argv.append('hydra.searchpath=[' + ','.join(search) + ']')
     main()
+
+
+if __name__ == "__main__":
+    launch()

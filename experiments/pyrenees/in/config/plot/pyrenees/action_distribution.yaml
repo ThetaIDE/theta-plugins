@@ -1,5 +1,0 @@
-# Default configuration for ActionDistributionPlotter (Pyrenees ITS)
-# Evaluates policy action distributions segmented by student competency tiers.
-enabled: true
-figsize: [8, 5]
-dpi: 300

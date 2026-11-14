@@ -26,7 +26,8 @@ def get_ep_eval_data(exp_id, cfg, group, output_dir):
         with open(cache_path, "rb") as f:
             return pickle.load(f)
 
-    from src.usr.eval.early_prediction.eval_logic import compute_ep_eval_data
+    from src.app.core.provider_loader import provider_object
+    compute_ep_eval_data = provider_object('mimic-early-prediction', 'eval_logic.py:compute_ep_eval_data')
 
     if not ckpt_dir.exists():
         print(f"Error: Could not find checkpoint directory for {exp_id}")

@@ -4,10 +4,7 @@ import numpy as np
 import torch as th
 
 from src.app.core.env_vectorized import VectorizedBaseEnv
-from src.app.core.utils import load_module
-
-_env_mod = load_module(str(Path(__file__).resolve().parent / "env.py"))
-DoomSimGym = _env_mod.DoomSimGym
+from .env import DoomSimGym
 
 
 class VectorizedNudgeEnv(VectorizedBaseEnv):
@@ -31,7 +28,8 @@ class VectorizedNudgeEnv(VectorizedBaseEnv):
         seed=None,
         **kwargs,
     ):
-        super().__init__(mode)
+        super().__init__()
+        self.mode = mode
         self.n_envs = n_envs
         self.seed = seed
 

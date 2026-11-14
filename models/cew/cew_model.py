@@ -227,7 +227,7 @@ class CEWModel(nn.Module, DynamicTopologyProtocol, ExtraStateProtocol, HasModelC
 
     def get_callbacks(self) -> list:
         """Return the self-organization callback for this model."""
-        from src.usr.models.cew.cew_callback import CEWSelfOrganizationCallback
+        from .cew_callback import CEWSelfOrganizationCallback
 
         return [CEWSelfOrganizationCallback(self)]
 

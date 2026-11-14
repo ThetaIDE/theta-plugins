@@ -1,10 +1,7 @@
 """Obsidian Vault and Research Notes Plugin for ThetaIDE."""
 from frontend.plugins.base import Plugin, PluginManifest
 from frontend.plugins.context import PluginContext
-try:
-    from .panel import ObsidianPanel
-except (ImportError, ValueError):
-    from frontend.plugins.obsidian.panel import ObsidianPanel
+from .panel import ObsidianPanel
 
 
 class ObsidianPlugin(Plugin):

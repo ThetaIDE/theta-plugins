@@ -1,8 +1,8 @@
-from nsfr.fol.data_utils import DataUtils
-from nsfr.fol.language import DataType
-from nsfr.fol.logic import *
-from nsfr.infer import ClauseBodyInferModule, ClauseInferModule, InferModule
-from nsfr.tensor_encoder import TensorEncoder
+from ..fol.data_utils import DataUtils
+from ..fol.language import DataType
+from ..fol.logic import *
+from ..infer import ClauseBodyInferModule, ClauseInferModule, InferModule
+from ..tensor_encoder import TensorEncoder
 
 p_ = Predicate('.', 1, [DataType('spec')])
 false = Atom(p_, [Const('__F__', dtype=DataType('spec'))])

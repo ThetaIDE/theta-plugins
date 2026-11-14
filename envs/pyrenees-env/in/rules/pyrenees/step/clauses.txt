@@ -1,2 +1,0 @@
-action_we(X):-low_competency(X).
-action_ps(X):-med_competency(X).

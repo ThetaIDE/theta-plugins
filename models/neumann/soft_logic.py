@@ -1,6 +1,6 @@
 import torch
 
-from neumann.torch_utils import softor
+from .torch_utils import softor
 
 
 class SoftLogic:

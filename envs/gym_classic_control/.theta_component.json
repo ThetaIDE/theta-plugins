@@ -2,17 +2,17 @@
   "id": "gym_classic_control",
   "name": "Gymnasium Classic Control",
   "kind": "env",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "Standard Gymnasium classic control environments: CartPole, MountainCar, Pendulum, and Acrobot.",
   "author": {
     "name": "Theta-IDE Team"
   },
-  "config_path": "in/config/env/gym_classic_control/cartpole.yaml",
+  "config_path": "in/config/env/gym_classic_control/acrobot.yaml",
   "config_paths": [
+    "in/config/env/gym_classic_control/acrobot.yaml",
     "in/config/env/gym_classic_control/cartpole.yaml",
     "in/config/env/gym_classic_control/mountaincar.yaml",
-    "in/config/env/gym_classic_control/pendulum.yaml",
-    "in/config/env/gym_classic_control/acrobot.yaml"
+    "in/config/env/gym_classic_control/pendulum.yaml"
   ],
   "compatibility": {
     "theta": ">=2.0.0"
@@ -149,6 +149,52 @@
           }
         }
       }
+    }
+  },
+  "dependencies": {
+    "components": [],
+    "pip": []
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "gym_classic_control",
+      "kind": "env",
+      "entry_point": "env_vectorized.py:VectorizedEnv",
+      "aliases": [
+        "mountaincar",
+        "gym_classic_control/mountaincar",
+        "pendulum",
+        "gym_classic_control/pendulum",
+        "acrobot",
+        "gym_classic_control/acrobot"
+      ],
+      "resource_root": "."
+    },
+    {
+      "id": "cartpole",
+      "kind": "env",
+      "entry_point": "env_vectorized.py:VectorizedEnv",
+      "resource_root": "resources/cartpole",
+      "aliases": [
+        "gym_classic_control/cartpole"
+      ]
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "env_vectorized.py"
+    ],
+    "resources": [
+      "resources",
+      "requirements.txt"
+    ],
+    "configs": {
+      "in/config/env/gym_classic_control/acrobot.yaml": "configs/env/gym_classic_control/acrobot.yaml",
+      "in/config/env/gym_classic_control/cartpole.yaml": "configs/env/gym_classic_control/cartpole.yaml",
+      "in/config/env/gym_classic_control/mountaincar.yaml": "configs/env/gym_classic_control/mountaincar.yaml",
+      "in/config/env/gym_classic_control/pendulum.yaml": "configs/env/gym_classic_control/pendulum.yaml"
     }
   }
 }

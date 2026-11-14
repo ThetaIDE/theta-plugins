@@ -1,0 +1,4 @@
+left(X):-leaning_left(A).
+left(X):-moving_left(A).
+right(X):-leaning_right(A).
+right(X):-moving_right(A).
