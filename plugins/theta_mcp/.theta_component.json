@@ -1,0 +1,61 @@
+{
+  "id": "theta_mcp",
+  "name": "Theta MCP Server",
+  "version": "1.0.0",
+  "description": "Let Claude Code, Codex, pi, opencode, Cursor and other MCP agents use ThetaIDE: they can list and diagnose runs, read configs, logs and metrics, plot curves, compare variants across seeds, and, with your approval in the IDE, edit configs, launch or stop runs and install Hub components. Runs on 127.0.0.1 with a token; needs no other plugin.",
+  "author": "ccast44",
+  "default_enabled": true,
+  "icon": "theta_mcp",
+  "entry_point": "ThetaMCPPlugin",
+  "extra": {
+    "has_settings": true
+  },
+  "kind": "plugin",
+  "repository": "https://github.com/ThetaIDE/theta-plugins",
+  "license": "MIT",
+  "tags": [
+    "mcp",
+    "agents",
+    "claude-code",
+    "codex",
+    "tools",
+    "terminal"
+  ],
+  "dependencies": {
+    "components": [],
+    "pip": []
+  },
+  "storage_version": 2,
+  "api_version": 1,
+  "capabilities": [
+    {
+      "id": "theta_mcp",
+      "kind": "plugin",
+      "entry_point": "__init__.py:ThetaMCPPlugin"
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "__init__.py",
+      "project_config.py",
+      "server.py",
+      "settings_widget.py",
+      "harnesses.py",
+      "host.py",
+      "ide_tools/__init__.py",
+      "ide_tools/analysis.py",
+      "ide_tools/approval.py",
+      "ide_tools/bridge.py",
+      "ide_tools/chat_types.py",
+      "ide_tools/figures.py",
+      "ide_tools/hub.py",
+      "ide_tools/tools.py",
+      "ide_tools/watch.py"
+    ],
+    "resources": [
+      "theta_mcp.svg"
+    ],
+    "configs": {}
+  },
+  "config_paths": []
+}
