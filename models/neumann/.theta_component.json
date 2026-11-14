@@ -42,7 +42,6 @@
       "nsfr"
     ],
     "pip": [
-      "lark",
       "torch-geometric",
       "networkx",
       "joblib"

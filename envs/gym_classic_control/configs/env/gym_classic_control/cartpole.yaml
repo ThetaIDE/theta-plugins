@@ -5,6 +5,7 @@ preprocess_on_load: false
 env_id: CartPole-v1
 symbolic_name: cartpole
 action_meanings: [left, right]
+symbolic_observation_builder: package://gym_classic_control/resources/cartpole/valuation.py:build_symbolic_observation
 num_envs: 4
 num_steps: 500
 gamma: 0.99

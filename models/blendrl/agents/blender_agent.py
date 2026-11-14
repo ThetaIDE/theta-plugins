@@ -3,6 +3,7 @@ import pickle
 import random
 import sys
 import inspect
+import importlib
 from pathlib import Path
 from typing import Any
 
@@ -276,7 +277,7 @@ class BlenderActor(nn.Module):
 
         return action_probs, weights
 
-    def compute_action_probs_neural(self, neural_state, logic_state=None):
+    def compute_action_probs_neural(self, neural_state):
         """
         Compute action probabilities using only neural modules.
         """
@@ -286,7 +287,7 @@ class BlenderActor(nn.Module):
             l_in = self.blender.network[0].in_features
 
         dummy_logic = torch.zeros(neural_state.size(0), l_in).to(neural_state.device)
-        weights = self.to_blender_policy_distribution(neural_state, logic_state if logic_state is not None else dummy_logic)
+        weights = self.to_blender_policy_distribution(neural_state, dummy_logic)
 
         mask = weights.new_tensor([1.0 if kind == "neural" else 0.0 for kind in self.module_types])
         weights = weights * mask
@@ -345,7 +346,7 @@ class BlenderActor(nn.Module):
         elif self.actor_mode == "logic":
             return self.compute_action_probs_logic(logic_state)
         else:
-            return self.compute_action_probs_neural(neural_state, logic_state)
+            return self.compute_action_probs_neural(neural_state)
 
     def get_q_values(self, neural_state, logic_state=None):
         """Compute Q-values by blending Q-values from all modules."""
@@ -356,19 +357,9 @@ class BlenderActor(nn.Module):
                 logic_state = neural_state
         batch_size = neural_state.size(0)
         module_q_values = []
-        active = [
-            (self.actor_mode != "neural" or kind == "neural")
-            and (self.actor_mode != "logic" or kind != "neural")
-            for kind in self.module_types
-        ]
-        if not any(active):
-            raise ValueError(f"Actor mode {self.actor_mode!r} has no compatible policy modules.")
 
         for i, module in enumerate(self.policy_modules):
             m_type = self.module_types[i]
-            if not active[i]:
-                module_q_values.append(neural_state.new_zeros(batch_size, self.env.n_actions))
-                continue
             if m_type == "neural":
                 if hasattr(module, "get_q_values"):
                     try:
@@ -407,9 +398,6 @@ class BlenderActor(nn.Module):
             module_q_values.append(q)
 
         weights = self.to_blender_policy_distribution(neural_state, logic_state)
-        if self.actor_mode != "hybrid":
-            weights = weights * weights.new_tensor(active)
-            weights = weights / weights.sum(dim=1, keepdim=True).clamp_min(1e-12)
 
         q_values = torch.zeros(batch_size, self.env.n_actions, device=neural_state.device)
         for i, m_q in enumerate(module_q_values):
@@ -904,13 +892,35 @@ class BlenderActorCritic(nn.Module):
         return self.get_action_and_value(neural_state, logic_state, action=action)
 
     def build_logic_observation(self, neural_state):
-        """Consume symbolic states; expert, gate and critic construction stay here."""
-        if self.actor_mode == "neural" and self.blender_mode == "neural":
-            return neural_state
-        if getattr(self, "_symbolic_state_loader", None) is None:
-            from src.app.core.data_loaders import create_state_loader
-            self._symbolic_state_loader = create_state_loader(self.cfg)
-        return self._symbolic_state_loader(neural_state)
+        """Construct this model's symbolic input using an environment or model hook."""
+        builder = self.get_cfg("symbolic.observation_builder")
+        env_cfg = self.cfg.get("env", {}) if hasattr(self.cfg, "get") else {}
+        if not builder and hasattr(env_cfg, "get"):
+            builder = env_cfg.get("symbolic_observation_builder")
+        if builder:
+            if isinstance(builder, str):
+                module_name, separator, function_name = builder.rpartition(":")
+                if not separator or not module_name or not function_name:
+                    raise ValueError("A symbolic observation builder must use 'module:function' format.")
+                try:
+                    if module_name.startswith('package://'):
+                        from src.app.core.provider_loader import provider_object
+                        package_id, _, relative = module_name[10:].partition('/')
+                        builder = provider_object(package_id, relative + ':' + function_name)
+                    else:
+                        builder = getattr(importlib.import_module(module_name), function_name)
+                except (ImportError, AttributeError) as exc:
+                    raise ValueError(f"Cannot load symbolic observation builder {builder!r}.") from exc
+            if not callable(builder):
+                raise ValueError("The symbolic observation builder must be callable.")
+            result = builder(neural_state)
+            if not torch.is_tensor(result) or result.ndim < 2 or result.shape[0] != neural_state.shape[0]:
+                raise ValueError("The symbolic observation builder must return a tensor with the same batch size.")
+            return result
+        if neural_state.ndim == 2:
+            raise ValueError("BlendRL needs a symbolic observation builder for vector observations. "
+                             "Set model.symbolic.observation_builder or env.symbolic_observation_builder.")
+        return neural_state
 
     def get_action_probs(self, neural_state):
         logic_state = self.build_logic_observation(neural_state)
@@ -967,7 +977,7 @@ class BlenderActorCritic(nn.Module):
         # A missing symbolic critic must not turn the gate into a value scale.
         # Share the available state critic until a dedicated one is provided.
         logic_value = (self.get_logic_value(logic_state).squeeze(1)
-                       if self.logic_critic is not None and self.actor_mode != "neural" else neural_value)
+                       if self.logic_critic is not None else neural_value)
 
         # Weighted value blending
         # w_neural_sum * V_neural + w_logic_sum * V_logic

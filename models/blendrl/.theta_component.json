@@ -25,16 +25,13 @@
       "neumann"
     ],
     "pip": [
-      "captum",
-      "lark"
+      "captum"
     ]
   },
   "config_path": "in/config/model/blendrl.yaml",
   "config_paths": [
     "in/config/model/blendrl.yaml",
-    "in/config/plot/blendrl/blend_routing.yaml",
-    "in/config/data/blendrl/symbolic_state.yaml",
-    "in/config/data/blendrl/cartpole_state.yaml"
+    "in/config/plot/blendrl/blend_routing.yaml"
   ],
   "compatibility": {
     "theta": ">=2.0.0"
@@ -157,64 +154,6 @@
             "type": "boolean"
           }
         }
-      },
-      "in/config/data/blendrl/symbolic_state.yaml": {
-        "type": "object",
-        "properties": {
-          "object_count": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1,
-            "default": 1
-          },
-          "feature_count": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1,
-            "default": null
-          },
-          "builder": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "default": null
-          }
-        },
-        "additionalProperties": false
-      },
-      "in/config/data/blendrl/cartpole_state.yaml": {
-        "type": "object",
-        "properties": {
-          "object_count": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1,
-            "default": 1
-          },
-          "feature_count": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1,
-            "default": null
-          },
-          "builder": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "default": null
-          }
-        },
-        "additionalProperties": false
       }
     }
   },
@@ -227,28 +166,6 @@
       "entry_point": "agents/blender_agent.py:BlenderActorCritic",
       "aliases": [
         "blender"
-      ],
-      "input_requirements": [
-        {
-          "slot": "symbolic_state_loader",
-          "contract": "symbolic_state/v1",
-          "when": {
-            "actor_mode": [
-              "hybrid",
-              "logic"
-            ]
-          }
-        },
-        {
-          "slot": "symbolic_state_loader",
-          "contract": "symbolic_state/v1",
-          "when": {
-            "blender.mode": [
-              "symbolic",
-              "logic"
-            ]
-          }
-        }
       ]
     },
     {
@@ -256,48 +173,6 @@
       "kind": "plotter",
       "entry_point": "plot/blendrl/routing.py:BlendRoutingPlotter",
       "aliases": []
-    },
-    {
-      "id": "blendrl_symbolic_state",
-      "kind": "datamodule",
-      "role": "symbolic_state",
-      "entry_point": "symbolic_state.py:SymbolicStateLoader",
-      "output_contracts": [
-        "symbolic_state/v1"
-      ],
-      "paradigms": [
-        "online_rl",
-        "offline_rl"
-      ],
-      "parameter_schema": {
-        "type": "object",
-        "properties": {
-          "object_count": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1,
-            "default": 1
-          },
-          "feature_count": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1,
-            "default": null
-          },
-          "builder": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "default": null
-          }
-        },
-        "additionalProperties": false
-      }
     }
   ],
   "payload": {
@@ -307,15 +182,12 @@
       "agents/blender_agent.py",
       "agents/__init__.py",
       "plot/blendrl/__init__.py",
-      "plot/blendrl/routing.py",
-      "symbolic_state.py"
+      "plot/blendrl/routing.py"
     ],
     "resources": [],
     "configs": {
       "in/config/model/blendrl.yaml": "configs/model/blendrl.yaml",
-      "in/config/plot/blendrl/blend_routing.yaml": "configs/plot/blendrl/blend_routing.yaml",
-      "in/config/data/blendrl/symbolic_state.yaml": "configs/data/blendrl/symbolic_state.yaml",
-      "in/config/data/blendrl/cartpole_state.yaml": "configs/data/blendrl/cartpole_state.yaml"
+      "in/config/plot/blendrl/blend_routing.yaml": "configs/plot/blendrl/blend_routing.yaml"
     }
   }
 }
