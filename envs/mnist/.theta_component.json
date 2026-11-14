@@ -19,10 +19,10 @@
     "supervised",
     "unsupervised"
   ],
-  "config_path": "in/config/env/mnist/digits.yaml",
+  "config_path": "env/mnist/digits.yaml",
   "config_paths": [
-    "in/config/env/mnist/digits.yaml",
-    "in/config/env/mnist/mnist.yaml"
+    "env/mnist/digits.yaml",
+    "env/mnist/mnist.yaml"
   ],
   "dependencies": {
     "pip": [
@@ -36,7 +36,7 @@
     "type": "object",
     "properties": {},
     "x-theta-config-schemas": {
-      "in/config/env/mnist.yaml": {
+      "env/mnist.yaml": {
         "type": "object",
         "properties": {
           "env_id": {
@@ -74,7 +74,7 @@
           }
         }
       },
-      "in/config/env/digits.yaml": {
+      "env/digits.yaml": {
         "type": "object",
         "properties": {
           "env_id": {
@@ -114,7 +114,7 @@
       }
     }
   },
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {
@@ -138,8 +138,8 @@
       "requirements.txt"
     ],
     "configs": {
-      "in/config/env/mnist/digits.yaml": "configs/env/mnist/digits.yaml",
-      "in/config/env/mnist/mnist.yaml": "configs/env/mnist/mnist.yaml"
+      "env/mnist/digits.yaml": "configs/env/mnist/digits.yaml",
+      "env/mnist/mnist.yaml": "configs/env/mnist/mnist.yaml"
     }
   }
 }

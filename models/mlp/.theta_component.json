@@ -12,10 +12,10 @@
     "offline_rl",
     "supervised"
   ],
-  "config_path": "in/config/model/basics/mlp.yaml",
+  "config_path": "model/basics/mlp.yaml",
   "config_paths": [
-    "in/config/model/basics/mlp.yaml",
-    "in/config/model/basics/mlp_classifier.yaml"
+    "model/basics/mlp.yaml",
+    "model/basics/mlp_classifier.yaml"
   ],
   "suite": "thetalib",
   "hidden": true,
@@ -23,7 +23,7 @@
     "type": "object",
     "properties": {},
     "x-theta-config-schemas": {
-      "in/config/model/basics/mlp.yaml": {
+      "model/basics/mlp.yaml": {
         "type": "object",
         "properties": {
           "hidden_dims": {
@@ -47,7 +47,7 @@
           }
         }
       },
-      "in/config/model/basics/mlp_classifier.yaml": {
+      "model/basics/mlp_classifier.yaml": {
         "type": "object",
         "properties": {
           "hidden_dims": {
@@ -82,7 +82,7 @@
     ],
     "pip": []
   },
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {
@@ -149,8 +149,8 @@
     ],
     "resources": [],
     "configs": {
-      "in/config/model/basics/mlp.yaml": "configs/model/basics/mlp.yaml",
-      "in/config/model/basics/mlp_classifier.yaml": "configs/model/basics/mlp_classifier.yaml"
+      "model/basics/mlp.yaml": "configs/model/basics/mlp.yaml",
+      "model/basics/mlp_classifier.yaml": "configs/model/basics/mlp_classifier.yaml"
     }
   }
 }

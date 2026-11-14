@@ -28,10 +28,10 @@
       "captum"
     ]
   },
-  "config_path": "in/config/model/blendrl.yaml",
+  "config_path": "model/blendrl.yaml",
   "config_paths": [
-    "in/config/model/blendrl.yaml",
-    "in/config/plot/blendrl/blend_routing.yaml"
+    "model/blendrl.yaml",
+    "plot/blendrl/blend_routing.yaml"
   ],
   "compatibility": {
     "theta": ">=2.0.0"
@@ -122,7 +122,7 @@
       }
     },
     "x-theta-config-schemas": {
-      "in/config/plot/blendrl/blend_routing.yaml": {
+      "plot/blendrl/blend_routing.yaml": {
         "type": "object",
         "properties": {
           "output_subdir": {
@@ -157,7 +157,7 @@
       }
     }
   },
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {
@@ -186,8 +186,8 @@
     ],
     "resources": [],
     "configs": {
-      "in/config/model/blendrl.yaml": "configs/model/blendrl.yaml",
-      "in/config/plot/blendrl/blend_routing.yaml": "configs/plot/blendrl/blend_routing.yaml"
+      "model/blendrl.yaml": "configs/model/blendrl.yaml",
+      "plot/blendrl/blend_routing.yaml": "configs/plot/blendrl/blend_routing.yaml"
     }
   }
 }

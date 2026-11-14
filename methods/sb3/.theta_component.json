@@ -24,7 +24,7 @@
     "type": "object",
     "properties": {},
     "x-theta-config-schemas": {
-      "in/config/agent/sb3/a2c.yaml": {
+      "agent/sb3/a2c.yaml": {
         "type": "object",
         "properties": {
           "algorithm": {
@@ -73,7 +73,7 @@
           }
         }
       },
-      "in/config/agent/sb3/dqn.yaml": {
+      "agent/sb3/dqn.yaml": {
         "type": "object",
         "properties": {
           "algorithm": {
@@ -131,7 +131,7 @@
           }
         }
       },
-      "in/config/agent/sb3/ppo.yaml": {
+      "agent/sb3/ppo.yaml": {
         "type": "object",
         "properties": {
           "algorithm": {
@@ -186,7 +186,7 @@
           }
         }
       },
-      "in/config/agent/sb3/sac.yaml": {
+      "agent/sb3/sac.yaml": {
         "type": "object",
         "properties": {
           "algorithm": {
@@ -244,15 +244,15 @@
     }
   },
   "config_paths": [
-    "in/config/agent/sb3/a2c.yaml",
-    "in/config/agent/sb3/dqn.yaml",
-    "in/config/agent/sb3/ppo.yaml",
-    "in/config/agent/sb3/sac.yaml"
+    "agent/sb3/a2c.yaml",
+    "agent/sb3/dqn.yaml",
+    "agent/sb3/ppo.yaml",
+    "agent/sb3/sac.yaml"
   ],
   "paradigms": [
     "online_rl"
   ],
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {
@@ -313,11 +313,11 @@
       "requirements.txt"
     ],
     "configs": {
-      "in/config/agent/sb3/a2c.yaml": "configs/agent/sb3/a2c.yaml",
-      "in/config/agent/sb3/dqn.yaml": "configs/agent/sb3/dqn.yaml",
-      "in/config/agent/sb3/ppo.yaml": "configs/agent/sb3/ppo.yaml",
-      "in/config/agent/sb3/sac.yaml": "configs/agent/sb3/sac.yaml"
+      "agent/sb3/a2c.yaml": "configs/agent/sb3/a2c.yaml",
+      "agent/sb3/dqn.yaml": "configs/agent/sb3/dqn.yaml",
+      "agent/sb3/ppo.yaml": "configs/agent/sb3/ppo.yaml",
+      "agent/sb3/sac.yaml": "configs/agent/sb3/sac.yaml"
     }
   },
-  "config_path": "in/config/agent/sb3/a2c.yaml"
+  "config_path": "agent/sb3/a2c.yaml"
 }

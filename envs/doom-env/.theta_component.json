@@ -15,7 +15,7 @@
     "reinforcement-learning",
     "visual"
   ],
-  "config_path": "in/config/env/doom.yaml",
+  "config_path": "env/doom.yaml",
   "dependencies": {
     "components": [
       "thetalib"
@@ -66,9 +66,9 @@
     }
   },
   "config_paths": [
-    "in/config/env/doom.yaml"
+    "env/doom.yaml"
   ],
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {
@@ -91,7 +91,7 @@
     ],
     "resources": [],
     "configs": {
-      "in/config/env/doom.yaml": "configs/env/doom.yaml"
+      "env/doom.yaml": "configs/env/doom.yaml"
     }
   }
 }

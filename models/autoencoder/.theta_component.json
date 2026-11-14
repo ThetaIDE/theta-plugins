@@ -11,16 +11,16 @@
     "unsupervised",
     "supervised"
   ],
-  "config_path": "in/config/model/basics/autoencoder.yaml",
+  "config_path": "model/basics/autoencoder.yaml",
   "config_paths": [
-    "in/config/model/basics/autoencoder.yaml",
-    "in/config/model/basics/dense_autoencoder.yaml"
+    "model/basics/autoencoder.yaml",
+    "model/basics/dense_autoencoder.yaml"
   ],
   "parameter_schema": {
     "type": "object",
     "properties": {},
     "x-theta-config-schemas": {
-      "in/config/model/basics/autoencoder.yaml": {
+      "model/basics/autoencoder.yaml": {
         "type": "object",
         "properties": {
           "latent_dim": {
@@ -34,7 +34,7 @@
           }
         }
       },
-      "in/config/model/basics/dense_autoencoder.yaml": {
+      "model/basics/dense_autoencoder.yaml": {
         "type": "object",
         "properties": {
           "latent_dim": {
@@ -54,7 +54,7 @@
     "components": [],
     "pip": []
   },
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {
@@ -93,8 +93,8 @@
     ],
     "resources": [],
     "configs": {
-      "in/config/model/basics/autoencoder.yaml": "configs/model/basics/autoencoder.yaml",
-      "in/config/model/basics/dense_autoencoder.yaml": "configs/model/basics/dense_autoencoder.yaml"
+      "model/basics/autoencoder.yaml": "configs/model/basics/autoencoder.yaml",
+      "model/basics/dense_autoencoder.yaml": "configs/model/basics/dense_autoencoder.yaml"
     }
   }
 }

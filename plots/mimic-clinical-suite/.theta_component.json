@@ -16,18 +16,18 @@
     "offline_rl"
   ],
   "config_paths": [
-    "in/config/plot/mimic/clinical.yaml",
-    "in/config/plot/mimic/clinical_alignment.yaml",
-    "in/config/plot/mimic/ep_agreement.yaml",
-    "in/config/plot/mimic/ep_counterfactual_table.yaml",
-    "in/config/plot/mimic/ep_dl_sweep.yaml",
-    "in/config/plot/mimic/ep_trajectories.yaml"
+    "plot/mimic/clinical.yaml",
+    "plot/mimic/clinical_alignment.yaml",
+    "plot/mimic/ep_agreement.yaml",
+    "plot/mimic/ep_counterfactual_table.yaml",
+    "plot/mimic/ep_dl_sweep.yaml",
+    "plot/mimic/ep_trajectories.yaml"
   ],
   "parameter_schema": {
     "type": "object",
     "properties": {},
     "x-theta-config-schemas": {
-      "in/config/plot/mimic/clinical_alignment.yaml": {
+      "plot/mimic/clinical_alignment.yaml": {
         "type": "object",
         "properties": {
           "plots": {
@@ -50,7 +50,7 @@
           }
         }
       },
-      "in/config/plot/mimic/clinical.yaml": {
+      "plot/mimic/clinical.yaml": {
         "type": "object",
         "properties": {
           "figsize": {
@@ -73,7 +73,7 @@
           }
         }
       },
-      "in/config/plot/mimic/ep_agreement.yaml": {
+      "plot/mimic/ep_agreement.yaml": {
         "type": "object",
         "properties": {
           "agreement_metric": {
@@ -96,7 +96,7 @@
           }
         }
       },
-      "in/config/plot/mimic/ep_trajectories.yaml": {
+      "plot/mimic/ep_trajectories.yaml": {
         "type": "object",
         "properties": {
           "max_trajectories": {
@@ -116,7 +116,7 @@
           }
         }
       },
-      "in/config/plot/mimic/ep_counterfactual_table.yaml": {
+      "plot/mimic/ep_counterfactual_table.yaml": {
         "type": "object",
         "properties": {
           "format": {
@@ -130,7 +130,7 @@
           }
         }
       },
-      "in/config/plot/mimic/ep_dl_sweep.yaml": {
+      "plot/mimic/ep_dl_sweep.yaml": {
         "type": "object",
         "properties": {
           "enabled": {
@@ -161,7 +161,7 @@
     ],
     "pip": []
   },
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {
@@ -214,13 +214,13 @@
     ],
     "resources": [],
     "configs": {
-      "in/config/plot/mimic/clinical.yaml": "configs/plot/mimic/clinical.yaml",
-      "in/config/plot/mimic/clinical_alignment.yaml": "configs/plot/mimic/clinical_alignment.yaml",
-      "in/config/plot/mimic/ep_agreement.yaml": "configs/plot/mimic/ep_agreement.yaml",
-      "in/config/plot/mimic/ep_counterfactual_table.yaml": "configs/plot/mimic/ep_counterfactual_table.yaml",
-      "in/config/plot/mimic/ep_dl_sweep.yaml": "configs/plot/mimic/ep_dl_sweep.yaml",
-      "in/config/plot/mimic/ep_trajectories.yaml": "configs/plot/mimic/ep_trajectories.yaml"
+      "plot/mimic/clinical.yaml": "configs/plot/mimic/clinical.yaml",
+      "plot/mimic/clinical_alignment.yaml": "configs/plot/mimic/clinical_alignment.yaml",
+      "plot/mimic/ep_agreement.yaml": "configs/plot/mimic/ep_agreement.yaml",
+      "plot/mimic/ep_counterfactual_table.yaml": "configs/plot/mimic/ep_counterfactual_table.yaml",
+      "plot/mimic/ep_dl_sweep.yaml": "configs/plot/mimic/ep_dl_sweep.yaml",
+      "plot/mimic/ep_trajectories.yaml": "configs/plot/mimic/ep_trajectories.yaml"
     }
   },
-  "config_path": "in/config/plot/mimic/clinical.yaml"
+  "config_path": "plot/mimic/clinical.yaml"
 }

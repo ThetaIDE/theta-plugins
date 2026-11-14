@@ -7,9 +7,9 @@
   "author": {
     "name": "Hikaru Shindo"
   },
-  "config_path": "in/config/model/nsfr.yaml",
+  "config_path": "model/nsfr.yaml",
   "config_paths": [
-    "in/config/model/nsfr.yaml"
+    "model/nsfr.yaml"
   ],
   "compatibility": {
     "theta": ">=2.0.0"
@@ -45,7 +45,7 @@
     ]
   },
   "rules_root": "resources/rules",
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {
@@ -90,7 +90,7 @@
       "fol/exp.lark"
     ],
     "configs": {
-      "in/config/model/nsfr.yaml": "configs/model/nsfr.yaml"
+      "model/nsfr.yaml": "configs/model/nsfr.yaml"
     }
   }
 }

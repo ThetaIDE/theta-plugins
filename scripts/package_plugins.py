@@ -31,6 +31,7 @@ def payload_files(source, meta):
 
 def validate_all(records):
     from src.app.components.archive import validate_native_package
+    from src.app.components.sdk_boundary import violations
     from src.app.components.lifecycle import dependencies, check_version
     from src.app.core.provider_catalog import kind_name, ProviderCatalog
     from src.app.workspace import WorkspacePaths
@@ -40,6 +41,10 @@ def validate_all(records):
         catalog = ProviderCatalog(WorkspacePaths(Path(temp)))
     owners = {p.id: p.manifest for p in catalog.packages}
     selectors = {(c.kind, s.casefold()): p.id for p in catalog.packages for c in p.capabilities for s in (c.id, *c.aliases)}
+    # Packages reach the host only through the Theta SDK (src.app.api).
+    private = [f"{source.relative_to(ROOT).as_posix()}/{line}" for source, _ in records for line in violations(source)
+               if not line.split(':', 1)[0].split('/')[-1].startswith('test_')]
+    if private: raise ValueError('Packages use private host modules:\n  ' + '\n  '.join(private))
     for source, meta in records:
         validate_native_package(meta, source)
         if meta['id'] in owners: raise ValueError(f"Duplicate package ID: {meta['id']}")
@@ -56,7 +61,7 @@ def validate_all(records):
               'eval':('evaluator',('evaluator',)), 'plot':('plotter',())}
     for source,meta in records:
         for dest,relative in meta['payload']['configs'].items():
-            group=dest.split('/')[2]
+            group=dest.split('/')[0]
             if group not in groups: continue
             data=yaml.safe_load((source/relative).read_text()) or {}
             if not isinstance(data,dict): raise ValueError(f'Profile must be a mapping: {source/relative}')

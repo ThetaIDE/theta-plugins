@@ -8,7 +8,7 @@
     "name": "Theta Clinical Team"
   },
   "created_at": "2026-10-18T00:00:00Z",
-  "config_path": "in/config/env/mimic.yaml",
+  "config_path": "env/mimic.yaml",
   "dependencies": {
     "components": [
       "clinical-timeseries-data",
@@ -80,9 +80,9 @@
     }
   },
   "config_paths": [
-    "in/config/env/mimic.yaml"
+    "env/mimic.yaml"
   ],
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {
@@ -103,7 +103,7 @@
     ],
     "resources": [],
     "configs": {
-      "in/config/env/mimic.yaml": "configs/env/mimic.yaml"
+      "env/mimic.yaml": "configs/env/mimic.yaml"
     }
   }
 }

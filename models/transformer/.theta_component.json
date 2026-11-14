@@ -12,9 +12,9 @@
     "offline_rl",
     "supervised"
   ],
-  "config_path": "in/config/model/basics/transformer.yaml",
+  "config_path": "model/basics/transformer.yaml",
   "config_paths": [
-    "in/config/model/basics/transformer.yaml"
+    "model/basics/transformer.yaml"
   ],
   "parameter_schema": {
     "type": "object",
@@ -43,7 +43,7 @@
     "components": [],
     "pip": []
   },
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {
@@ -72,7 +72,7 @@
     ],
     "resources": [],
     "configs": {
-      "in/config/model/basics/transformer.yaml": "configs/model/basics/transformer.yaml"
+      "model/basics/transformer.yaml": "configs/model/basics/transformer.yaml"
     }
   }
 }

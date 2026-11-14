@@ -7,9 +7,9 @@
   "author": {
     "name": "Hikaru Shindo"
   },
-  "config_path": "in/config/model/neumann.yaml",
+  "config_path": "model/neumann.yaml",
   "config_paths": [
-    "in/config/model/neumann.yaml"
+    "model/neumann.yaml"
   ],
   "compatibility": {
     "theta": ">=2.0.0"
@@ -47,7 +47,7 @@
       "joblib"
     ]
   },
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {
@@ -86,7 +86,7 @@
       "fol/exp.lark"
     ],
     "configs": {
-      "in/config/model/neumann.yaml": "configs/model/neumann.yaml"
+      "model/neumann.yaml": "configs/model/neumann.yaml"
     }
   }
 }

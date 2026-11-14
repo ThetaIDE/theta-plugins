@@ -1,9 +1,0 @@
-# Default configuration for ClinicalAlignmentPlotter (MIMIC-III)
-# Evaluates policy agreement with clinicians and septic shock outcomes.
-plots:
-  - agreement_vs_shock
-
-agreement_metric: "windowed_jaccard"
-window_hours: 3
-empty_union_score: 1.0
-use_cache: false

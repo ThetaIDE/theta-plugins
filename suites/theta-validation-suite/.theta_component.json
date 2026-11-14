@@ -25,19 +25,19 @@
     "online_rl"
   ],
   "config_paths": [
-    "in/config/experiment/theta_validation/_base.yaml",
-    "in/config/experiment/theta_validation/failure/checkpoint_conflict.yaml",
-    "in/config/experiment/theta_validation/failure/incompatible_bc.yaml",
-    "in/config/experiment/theta_validation/failure/incompatible_cql.yaml",
-    "in/config/experiment/theta_validation/failure/incompatible_iql.yaml",
-    "in/config/experiment/theta_validation/failure/incompatible_td3_bc.yaml",
-    "in/config/experiment/theta_validation/failure/invalid_checkpoint_value.yaml",
-    "in/config/experiment/theta_validation/failure/malformed_telemetry_metrics.yaml",
-    "in/config/experiment/theta_validation/failure/missing_agent.yaml",
-    "in/config/experiment/theta_validation/failure/missing_method.yaml",
-    "in/config/experiment/theta_validation/failure/missing_model.yaml",
-    "in/config/experiment/theta_validation/failure/unknown_agent.yaml",
-    "in/config/experiment/theta_validation/success/online_smoke.yaml"
+    "experiment/theta_validation/_base.yaml",
+    "experiment/theta_validation/failure/checkpoint_conflict.yaml",
+    "experiment/theta_validation/failure/incompatible_bc.yaml",
+    "experiment/theta_validation/failure/incompatible_cql.yaml",
+    "experiment/theta_validation/failure/incompatible_iql.yaml",
+    "experiment/theta_validation/failure/incompatible_td3_bc.yaml",
+    "experiment/theta_validation/failure/invalid_checkpoint_value.yaml",
+    "experiment/theta_validation/failure/malformed_telemetry_metrics.yaml",
+    "experiment/theta_validation/failure/missing_agent.yaml",
+    "experiment/theta_validation/failure/missing_method.yaml",
+    "experiment/theta_validation/failure/missing_model.yaml",
+    "experiment/theta_validation/failure/unknown_agent.yaml",
+    "experiment/theta_validation/success/online_smoke.yaml"
   ],
   "test_suite": {
     "format": "theta.test-suite/v1",
@@ -46,7 +46,7 @@
         "id": "gym_classic_control/cartpole",
         "title": "CartPole live environment",
         "description": "The Basic Suite environment must expose an online-RL CartPole environment.",
-        "config_path": "in/config/env/gym_classic_control/cartpole.yaml",
+        "config_path": "env/gym_classic_control/cartpole.yaml",
         "required": {
           "env_id": "CartPole-v1",
           "compatible_paradigms": [
@@ -58,7 +58,7 @@
         "id": "sb3/ppo",
         "title": "SB3 PPO algorithm",
         "description": "PPO must retain its runner entrypoint, algorithm identity, and online-RL capability declaration.",
-        "config_path": "in/config/agent/sb3/ppo.yaml",
+        "config_path": "agent/sb3/ppo.yaml",
         "required": {
           "entrypoint": "package://sb3-suite/sb3_runner.py",
           "algorithm": "PPO",
@@ -71,7 +71,7 @@
         "id": "d3rlpy/cql",
         "title": "d3rlpy CQL algorithm",
         "description": "CQL must retain its runner entrypoint, algorithm identity, and offline-RL capability declaration.",
-        "config_path": "in/config/agent/d3rlpy/cql.yaml",
+        "config_path": "agent/d3rlpy/cql.yaml",
         "required": {
           "entrypoint": "package://d3rlpy-suite/d3rlpy_runner.py",
           "algorithm": "CQL",
@@ -84,7 +84,7 @@
         "id": "basics/dnn",
         "title": "DNN model",
         "description": "The Basic Suite DNN must expose its architecture configuration.",
-        "config_path": "in/config/model/basics/dnn.yaml",
+        "config_path": "model/basics/dnn.yaml",
         "required": {
           "architecture": "dnn"
         }
@@ -93,7 +93,7 @@
         "id": "thetalib/tabular_data",
         "title": "Tabular data module",
         "description": "The data-loader adapter must remain independently configurable from a dataset environment.",
-        "config_path": "in/config/data/thetalib/tabular_data.yaml",
+        "config_path": "data/thetalib/tabular_data.yaml",
         "required": {
           "data_module": "tabular_data",
           "batch_size": 128
@@ -221,27 +221,27 @@
       }
     ]
   },
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [],
   "payload": {
     "implementations": [],
     "resources": [],
     "configs": {
-      "in/config/experiment/theta_validation/_base.yaml": "configs/experiment/theta_validation/_base.yaml",
-      "in/config/experiment/theta_validation/failure/checkpoint_conflict.yaml": "configs/experiment/theta_validation/failure/checkpoint_conflict.yaml",
-      "in/config/experiment/theta_validation/failure/incompatible_bc.yaml": "configs/experiment/theta_validation/failure/incompatible_bc.yaml",
-      "in/config/experiment/theta_validation/failure/incompatible_cql.yaml": "configs/experiment/theta_validation/failure/incompatible_cql.yaml",
-      "in/config/experiment/theta_validation/failure/incompatible_iql.yaml": "configs/experiment/theta_validation/failure/incompatible_iql.yaml",
-      "in/config/experiment/theta_validation/failure/incompatible_td3_bc.yaml": "configs/experiment/theta_validation/failure/incompatible_td3_bc.yaml",
-      "in/config/experiment/theta_validation/failure/invalid_checkpoint_value.yaml": "configs/experiment/theta_validation/failure/invalid_checkpoint_value.yaml",
-      "in/config/experiment/theta_validation/failure/malformed_telemetry_metrics.yaml": "configs/experiment/theta_validation/failure/malformed_telemetry_metrics.yaml",
-      "in/config/experiment/theta_validation/failure/missing_agent.yaml": "configs/experiment/theta_validation/failure/missing_agent.yaml",
-      "in/config/experiment/theta_validation/failure/missing_method.yaml": "configs/experiment/theta_validation/failure/missing_method.yaml",
-      "in/config/experiment/theta_validation/failure/missing_model.yaml": "configs/experiment/theta_validation/failure/missing_model.yaml",
-      "in/config/experiment/theta_validation/failure/unknown_agent.yaml": "configs/experiment/theta_validation/failure/unknown_agent.yaml",
-      "in/config/experiment/theta_validation/success/online_smoke.yaml": "configs/experiment/theta_validation/success/online_smoke.yaml"
+      "experiment/theta_validation/_base.yaml": "configs/experiment/theta_validation/_base.yaml",
+      "experiment/theta_validation/failure/checkpoint_conflict.yaml": "configs/experiment/theta_validation/failure/checkpoint_conflict.yaml",
+      "experiment/theta_validation/failure/incompatible_bc.yaml": "configs/experiment/theta_validation/failure/incompatible_bc.yaml",
+      "experiment/theta_validation/failure/incompatible_cql.yaml": "configs/experiment/theta_validation/failure/incompatible_cql.yaml",
+      "experiment/theta_validation/failure/incompatible_iql.yaml": "configs/experiment/theta_validation/failure/incompatible_iql.yaml",
+      "experiment/theta_validation/failure/incompatible_td3_bc.yaml": "configs/experiment/theta_validation/failure/incompatible_td3_bc.yaml",
+      "experiment/theta_validation/failure/invalid_checkpoint_value.yaml": "configs/experiment/theta_validation/failure/invalid_checkpoint_value.yaml",
+      "experiment/theta_validation/failure/malformed_telemetry_metrics.yaml": "configs/experiment/theta_validation/failure/malformed_telemetry_metrics.yaml",
+      "experiment/theta_validation/failure/missing_agent.yaml": "configs/experiment/theta_validation/failure/missing_agent.yaml",
+      "experiment/theta_validation/failure/missing_method.yaml": "configs/experiment/theta_validation/failure/missing_method.yaml",
+      "experiment/theta_validation/failure/missing_model.yaml": "configs/experiment/theta_validation/failure/missing_model.yaml",
+      "experiment/theta_validation/failure/unknown_agent.yaml": "configs/experiment/theta_validation/failure/unknown_agent.yaml",
+      "experiment/theta_validation/success/online_smoke.yaml": "configs/experiment/theta_validation/success/online_smoke.yaml"
     }
   },
-  "config_path": "in/config/experiment/theta_validation/_base.yaml"
+  "config_path": "experiment/theta_validation/_base.yaml"
 }

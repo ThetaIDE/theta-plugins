@@ -17,7 +17,7 @@
     "reinforcement-learning",
     "benchmark"
   ],
-  "config_path": "in/config/env/atari/beam_rider.yaml",
+  "config_path": "env/atari/beam_rider.yaml",
   "dependencies": {
     "components": [
       "thetalib"
@@ -35,7 +35,7 @@
     "type": "object",
     "properties": {},
     "x-theta-config-schemas": {
-      "in/config/env/atari/beam_rider.yaml": {
+      "env/atari/beam_rider.yaml": {
         "type": "object",
         "properties": {
           "monitor_metric": {
@@ -70,7 +70,7 @@
           }
         }
       },
-      "in/config/env/atari/breakout.yaml": {
+      "env/atari/breakout.yaml": {
         "type": "object",
         "properties": {
           "monitor_metric": {
@@ -105,7 +105,7 @@
           }
         }
       },
-      "in/config/env/atari/mspacman.yaml": {
+      "env/atari/mspacman.yaml": {
         "type": "object",
         "properties": {
           "monitor_metric": {
@@ -140,7 +140,7 @@
           }
         }
       },
-      "in/config/env/atari/pong.yaml": {
+      "env/atari/pong.yaml": {
         "type": "object",
         "properties": {
           "monitor_metric": {
@@ -175,7 +175,7 @@
           }
         }
       },
-      "in/config/env/atari/qbert.yaml": {
+      "env/atari/qbert.yaml": {
         "type": "object",
         "properties": {
           "monitor_metric": {
@@ -210,7 +210,7 @@
           }
         }
       },
-      "in/config/env/atari/seaquest.yaml": {
+      "env/atari/seaquest.yaml": {
         "type": "object",
         "properties": {
           "monitor_metric": {
@@ -245,7 +245,7 @@
           }
         }
       },
-      "in/config/env/atari/space_invaders.yaml": {
+      "env/atari/space_invaders.yaml": {
         "type": "object",
         "properties": {
           "monitor_metric": {
@@ -283,15 +283,15 @@
     }
   },
   "config_paths": [
-    "in/config/env/atari/beam_rider.yaml",
-    "in/config/env/atari/breakout.yaml",
-    "in/config/env/atari/mspacman.yaml",
-    "in/config/env/atari/pong.yaml",
-    "in/config/env/atari/qbert.yaml",
-    "in/config/env/atari/seaquest.yaml",
-    "in/config/env/atari/space_invaders.yaml"
+    "env/atari/beam_rider.yaml",
+    "env/atari/breakout.yaml",
+    "env/atari/mspacman.yaml",
+    "env/atari/pong.yaml",
+    "env/atari/qbert.yaml",
+    "env/atari/seaquest.yaml",
+    "env/atari/space_invaders.yaml"
   ],
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {
@@ -319,13 +319,13 @@
       "requirements.txt"
     ],
     "configs": {
-      "in/config/env/atari/beam_rider.yaml": "configs/env/atari/beam_rider.yaml",
-      "in/config/env/atari/breakout.yaml": "configs/env/atari/breakout.yaml",
-      "in/config/env/atari/mspacman.yaml": "configs/env/atari/mspacman.yaml",
-      "in/config/env/atari/pong.yaml": "configs/env/atari/pong.yaml",
-      "in/config/env/atari/qbert.yaml": "configs/env/atari/qbert.yaml",
-      "in/config/env/atari/seaquest.yaml": "configs/env/atari/seaquest.yaml",
-      "in/config/env/atari/space_invaders.yaml": "configs/env/atari/space_invaders.yaml"
+      "env/atari/beam_rider.yaml": "configs/env/atari/beam_rider.yaml",
+      "env/atari/breakout.yaml": "configs/env/atari/breakout.yaml",
+      "env/atari/mspacman.yaml": "configs/env/atari/mspacman.yaml",
+      "env/atari/pong.yaml": "configs/env/atari/pong.yaml",
+      "env/atari/qbert.yaml": "configs/env/atari/qbert.yaml",
+      "env/atari/seaquest.yaml": "configs/env/atari/seaquest.yaml",
+      "env/atari/space_invaders.yaml": "configs/env/atari/space_invaders.yaml"
     }
   }
 }

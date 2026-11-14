@@ -24,7 +24,7 @@
     "type": "object",
     "properties": {},
     "x-theta-config-schemas": {
-      "in/config/env/mujoco/ant.yaml": {
+      "env/mujoco/ant.yaml": {
         "type": "object",
         "properties": {
           "monitor_metric": {
@@ -56,7 +56,7 @@
           }
         }
       },
-      "in/config/env/mujoco/half_cheetah.yaml": {
+      "env/mujoco/half_cheetah.yaml": {
         "type": "object",
         "properties": {
           "monitor_metric": {
@@ -88,7 +88,7 @@
           }
         }
       },
-      "in/config/env/mujoco/hopper.yaml": {
+      "env/mujoco/hopper.yaml": {
         "type": "object",
         "properties": {
           "monitor_metric": {
@@ -120,7 +120,7 @@
           }
         }
       },
-      "in/config/env/mujoco/walker2d.yaml": {
+      "env/mujoco/walker2d.yaml": {
         "type": "object",
         "properties": {
           "monitor_metric": {
@@ -152,7 +152,7 @@
           }
         }
       },
-      "in/config/env/mujoco/humanoid.yaml": {
+      "env/mujoco/humanoid.yaml": {
         "type": "object",
         "properties": {
           "monitor_metric": {
@@ -186,7 +186,7 @@
       }
     }
   },
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {

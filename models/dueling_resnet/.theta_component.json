@@ -7,9 +7,9 @@
   "author": {
     "name": "Theta-IDE Team"
   },
-  "config_path": "in/config/model/basics/dueling_resnet.yaml",
+  "config_path": "model/basics/dueling_resnet.yaml",
   "config_paths": [
-    "in/config/model/basics/dueling_resnet.yaml"
+    "model/basics/dueling_resnet.yaml"
   ],
   "compatibility": {
     "theta": ">=2.0.0"
@@ -31,7 +31,7 @@
     "components": [],
     "pip": []
   },
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {
@@ -51,7 +51,7 @@
     ],
     "resources": [],
     "configs": {
-      "in/config/model/basics/dueling_resnet.yaml": "configs/model/basics/dueling_resnet.yaml"
+      "model/basics/dueling_resnet.yaml": "configs/model/basics/dueling_resnet.yaml"
     }
   }
 }

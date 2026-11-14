@@ -25,7 +25,7 @@
     "type": "object",
     "properties": {},
     "x-theta-config-schemas": {
-      "in/config/agent/d3rlpy/bc.yaml": {
+      "agent/d3rlpy/bc.yaml": {
         "type": "object",
         "properties": {
           "algorithm": {
@@ -45,7 +45,7 @@
           }
         }
       },
-      "in/config/agent/d3rlpy/cql.yaml": {
+      "agent/d3rlpy/cql.yaml": {
         "type": "object",
         "properties": {
           "algorithm": {
@@ -71,7 +71,7 @@
           }
         }
       },
-      "in/config/agent/d3rlpy/iql.yaml": {
+      "agent/d3rlpy/iql.yaml": {
         "type": "object",
         "properties": {
           "algorithm": {
@@ -100,7 +100,7 @@
           }
         }
       },
-      "in/config/agent/d3rlpy/td3_bc.yaml": {
+      "agent/d3rlpy/td3_bc.yaml": {
         "type": "object",
         "properties": {
           "algorithm": {
@@ -129,12 +129,12 @@
     }
   },
   "config_paths": [
-    "in/config/agent/d3rlpy/bc.yaml",
-    "in/config/agent/d3rlpy/cql.yaml",
-    "in/config/agent/d3rlpy/iql.yaml",
-    "in/config/agent/d3rlpy/td3_bc.yaml"
+    "agent/d3rlpy/bc.yaml",
+    "agent/d3rlpy/cql.yaml",
+    "agent/d3rlpy/iql.yaml",
+    "agent/d3rlpy/td3_bc.yaml"
   ],
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {
@@ -190,11 +190,11 @@
       "requirements.txt"
     ],
     "configs": {
-      "in/config/agent/d3rlpy/bc.yaml": "configs/agent/d3rlpy/bc.yaml",
-      "in/config/agent/d3rlpy/cql.yaml": "configs/agent/d3rlpy/cql.yaml",
-      "in/config/agent/d3rlpy/iql.yaml": "configs/agent/d3rlpy/iql.yaml",
-      "in/config/agent/d3rlpy/td3_bc.yaml": "configs/agent/d3rlpy/td3_bc.yaml"
+      "agent/d3rlpy/bc.yaml": "configs/agent/d3rlpy/bc.yaml",
+      "agent/d3rlpy/cql.yaml": "configs/agent/d3rlpy/cql.yaml",
+      "agent/d3rlpy/iql.yaml": "configs/agent/d3rlpy/iql.yaml",
+      "agent/d3rlpy/td3_bc.yaml": "configs/agent/d3rlpy/td3_bc.yaml"
     }
   },
-  "config_path": "in/config/agent/d3rlpy/bc.yaml"
+  "config_path": "agent/d3rlpy/bc.yaml"
 }

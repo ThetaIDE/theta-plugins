@@ -8,7 +8,7 @@
     "name": "Theta-IDE Team"
   },
   "created_at": "2026-10-18T00:00:00Z",
-  "config_path": "in/config/data/thetalib/replay_buffer.yaml",
+  "config_path": "data/thetalib/replay_buffer.yaml",
   "compatibility": {
     "theta": ">=2.0.0"
   },
@@ -16,7 +16,7 @@
     "offline_rl"
   ],
   "config_paths": [
-    "in/config/data/thetalib/replay_buffer.yaml"
+    "data/thetalib/replay_buffer.yaml"
   ],
   "suite": "thetalib",
   "hidden": true,
@@ -44,7 +44,7 @@
     "components": [],
     "pip": []
   },
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {
@@ -64,7 +64,7 @@
     ],
     "resources": [],
     "configs": {
-      "in/config/data/thetalib/replay_buffer.yaml": "configs/data/thetalib/replay_buffer.yaml"
+      "data/thetalib/replay_buffer.yaml": "configs/data/thetalib/replay_buffer.yaml"
     }
   }
 }

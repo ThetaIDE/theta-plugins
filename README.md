@@ -5,9 +5,10 @@ evaluators, plots, application extensions, experiment profiles and dependency
 suites for Theta-IDE. The IDE separately ships its generic framework, four base
 paradigms and bundled providers.
 
-All 37 maintained packages use native manifests: `storage_version: 2`,
+All 39 maintained packages use native manifests: `storage_version: 3`,
 `api_version: 1`, explicit capabilities, package-relative entry points, resources,
-config mappings and dependencies. The authoritative record is each package's
+config mappings and dependencies. Config destinations are logical selectors
+relative to the workspace config root (`model/nsfr.yaml`). The authoritative record is each package's
 `.theta_component.json`. App packages also retain `plugin.json` for panel IDs,
 settings and default activation. A source folder need not mirror its installation
 location.
@@ -23,7 +24,9 @@ Use the sibling IDE's Python environment and shared validation:
 ```
 
 The builder validates all maintained manifests, provider/config selectors,
-dependency ownership, cycles and versions before writing output. Archive names
+dependency ownership, cycles and versions before writing output. It also rejects
+package code that imports host modules outside the Theta SDK (`src.app.api`) or
+reaches into the host window. Archive names
 and versions come from source metadata. `index.json` preserves manifest fields
 and records each local archive's SHA-256. Archives contain declared payloads and
 runtime assets; development caches and duplicate embedded suite sources are
@@ -49,9 +52,8 @@ Install component dependencies first when using local archives. The existing
 Hub dependency workflow is separate from local verification. `--no-dependencies`
 suppresses Python dependency installation; it still checks required component
 ownership. Installed packages go under `src/plugins/{components,app}/installed`,
-editable copies under `src/usr`, and active profiles under `in/config`.
-No workspace migration is required. Old archives/layouts are rejected rather
-than adapted or guessed. Existing user/installed implementations are never
+editable copies under `src/usr`, and editable profiles under `src/usr/config`.
+Older archive formats are rejected rather than adapted or guessed. Existing user/installed implementations are never
 rewritten by source conversion.
 
 ## Ownership decisions
@@ -75,11 +77,13 @@ rewritten by source conversion.
   reports unsupported algorithms/APIs rather than falling back to another
   algorithm, synthesizing data, or silently omitting training.
 
-Use relative imports inside packages. Cross-package helpers use
-`src.app.core.provider_loader.provider_object`; resources use `package://ID/path`
-and the environment/rules APIs. Profiles live under `configs/<group>/...`, with
+Use relative imports inside packages and import the host only through the
+Theta SDK (`src.app.api`, see the IDE's `docs/reference/SDK.md`). A package
+publishes objects for others in its manifest `exports`; consumers declare the
+dependency and load them with `src.app.api.packages.provider_export`. Resources
+use `package://ID/path` and the environment/rules APIs. Profiles live under `configs/<group>/...`, with
 workspace overrides taking precedence. Do not introduce source-depth calculations,
-`sys.path` provider roots, global import aliases or `in/envs`/`in/rules` references.
+`sys.path` provider roots or global import aliases.
 
 ## Verification
 
@@ -98,5 +102,4 @@ not download Python packages or publish artifacts. Full MIMIC experiments need
 external clinical datasets/checkpoints; Atari/MuJoCo need their runtime assets;
 interactive DOOM/Antigravity browser services are not exercised headlessly.
 
-See the IDE's `docs/PLUGIN_NATIVE_INTEGRATION.md` for package-by-package evidence
-and the scope of the retained, fixed API-1 forwarding modules.
+See the IDE's `docs/reference/PLUGIN_STORAGE.md` for the package format.

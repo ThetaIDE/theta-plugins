@@ -18,9 +18,9 @@
     "unsupervised"
   ],
   "config_paths": [
-    "in/config/plot/thetalib/convergence.yaml",
-    "in/config/plot/thetalib/losses.yaml",
-    "in/config/plot/thetalib/reports.yaml"
+    "plot/thetalib/convergence.yaml",
+    "plot/thetalib/losses.yaml",
+    "plot/thetalib/reports.yaml"
   ],
   "suite": "thetalib",
   "hidden": true,
@@ -28,7 +28,7 @@
     "type": "object",
     "properties": {},
     "x-theta-config-schemas": {
-      "in/config/plot/thetalib/convergence.yaml": {
+      "plot/thetalib/convergence.yaml": {
         "type": "object",
         "properties": {
           "output_subdir": {
@@ -89,7 +89,7 @@
           }
         }
       },
-      "in/config/plot/thetalib/losses.yaml": {
+      "plot/thetalib/losses.yaml": {
         "type": "object",
         "properties": {
           "output_subdir": {
@@ -144,7 +144,7 @@
           }
         }
       },
-      "in/config/plot/thetalib/reports.yaml": {
+      "plot/thetalib/reports.yaml": {
         "type": "object",
         "properties": {
           "include_hyperparameters": {
@@ -163,17 +163,17 @@
     ],
     "pip": []
   },
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [],
   "payload": {
     "implementations": [],
     "resources": [],
     "configs": {
-      "in/config/plot/thetalib/convergence.yaml": "configs/plot/thetalib/convergence.yaml",
-      "in/config/plot/thetalib/losses.yaml": "configs/plot/thetalib/losses.yaml",
-      "in/config/plot/thetalib/reports.yaml": "configs/plot/thetalib/reports.yaml"
+      "plot/thetalib/convergence.yaml": "configs/plot/thetalib/convergence.yaml",
+      "plot/thetalib/losses.yaml": "configs/plot/thetalib/losses.yaml",
+      "plot/thetalib/reports.yaml": "configs/plot/thetalib/reports.yaml"
     }
   },
-  "config_path": "in/config/plot/thetalib/convergence.yaml"
+  "config_path": "plot/thetalib/convergence.yaml"
 }

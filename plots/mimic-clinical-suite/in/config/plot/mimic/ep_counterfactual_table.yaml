@@ -1,5 +1,0 @@
-format: markdown
-metrics:
-  - vasopressor_agreement
-  - iv_fluids_agreement
-  - survival_rate

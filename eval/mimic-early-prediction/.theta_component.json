@@ -8,7 +8,7 @@
     "name": "Theta Clinical Team"
   },
   "created_at": "2026-10-18T00:00:00Z",
-  "config_path": "in/config/eval/mimic/early_prediction.yaml",
+  "config_path": "eval/mimic/early_prediction.yaml",
   "compatibility": {
     "theta": ">=2.0.0"
   },
@@ -17,7 +17,7 @@
     "offline_rl"
   ],
   "config_paths": [
-    "in/config/eval/mimic/early_prediction.yaml"
+    "eval/mimic/early_prediction.yaml"
   ],
   "parameter_schema": {
     "type": "object",
@@ -46,7 +46,7 @@
     "components": [],
     "pip": []
   },
-  "storage_version": 2,
+  "storage_version": 3,
   "api_version": 1,
   "capabilities": [
     {
@@ -76,7 +76,7 @@
     ],
     "resources": [],
     "configs": {
-      "in/config/eval/mimic/early_prediction.yaml": "configs/eval/mimic/early_prediction.yaml"
+      "eval/mimic/early_prediction.yaml": "configs/eval/mimic/early_prediction.yaml"
     }
   }
 }

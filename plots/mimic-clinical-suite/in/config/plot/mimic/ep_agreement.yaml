@@ -1,5 +1,0 @@
-agreement_metric: "windowed_jaccard"
-window_hours: 3
-empty_union_score: 1.0
-figsize: [8, 6]
-dpi: 300
