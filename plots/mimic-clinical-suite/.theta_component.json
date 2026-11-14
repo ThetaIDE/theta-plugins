@@ -2,7 +2,7 @@
   "id": "mimic-clinical-suite",
   "name": "MIMIC Clinical Evaluation & Visualization Suite",
   "kind": "plotter",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Clinical policy alignment, septic shock trajectory counterfactuals, and clinician agreement visualizers.",
   "author": {
     "name": "Theta Clinical Team"

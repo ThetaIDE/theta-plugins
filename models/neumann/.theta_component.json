@@ -2,7 +2,7 @@
   "id": "neumann",
   "name": "NEUMANN Neural Symbolic Reasoner",
   "kind": "model",
-  "version": "1.0.7",
+  "version": "1.1.0",
   "description": "Neuro-symbolic message passing reasoner over logic graphs.",
   "author": {
     "name": "Hikaru Shindo"

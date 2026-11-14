@@ -2,7 +2,7 @@
   "id": "nsfr",
   "name": "Neural Symbolic Forward Reasoner (NSFR)",
   "kind": "model",
-  "version": "1.0.7",
+  "version": "1.1.0",
   "description": "Differentiable forward reasoning engine computing soft valuations over first-order logic clauses.",
   "author": {
     "name": "Hikaru Shindo"

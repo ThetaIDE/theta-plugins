@@ -2,7 +2,7 @@
   "id": "autoencoder",
   "name": "Dense & Sequence Autoencoders",
   "kind": "model",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Dense and sequence autoencoder architectures for unsupervised representation learning.",
   "author": {
     "name": "Theta-IDE Team"

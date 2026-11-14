@@ -2,7 +2,7 @@
   "id": "dueling_resnet",
   "name": "Dueling ResNet",
   "kind": "model",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Scaled residual policy and Q-network architecture with LayerNorm, GELU, and Dueling decomposition.",
   "author": {
     "name": "Theta-IDE Team"

@@ -2,7 +2,7 @@
   "id": "mnist",
   "name": "MNIST Handwritten Digits",
   "kind": "env",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Handwritten digits classification benchmark (8x8 mini-MNIST and 28x28 MNIST) supporting supervised, unsupervised, and RL environments.",
   "author": {
     "name": "Theta-IDE Team"

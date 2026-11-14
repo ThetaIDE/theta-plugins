@@ -2,7 +2,7 @@
   "id": "tabular-data",
   "name": "Tabular Data Module",
   "kind": "datamodule",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "General tabular dataset loader supporting CSV, NPZ, and NPY files with automated train/val/test splitting and standardization.",
   "author": {
     "name": "Theta-IDE Team"

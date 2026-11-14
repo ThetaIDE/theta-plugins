@@ -2,7 +2,7 @@
   "id": "robotics-mujoco",
   "name": "Gymnasium MuJoCo Robotics",
   "kind": "env",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Continuous-control robotics benchmarks from Gymnasium MuJoCo: Ant, HalfCheetah, Hopper, Walker2d, and Humanoid.",
   "author": {
     "name": "Theta-IDE Team"

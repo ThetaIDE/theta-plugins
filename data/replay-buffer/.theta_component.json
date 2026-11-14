@@ -2,7 +2,7 @@
   "id": "replay-buffer",
   "name": "RL Replay Buffer Data Module",
   "kind": "datamodule",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "General transition replay loader and chunk reader for offline reinforcement learning.",
   "author": {
     "name": "Theta-IDE Team"

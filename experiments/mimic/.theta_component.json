@@ -2,7 +2,7 @@
   "id": "mimic",
   "name": "MIMIC Clinical Sepsis Benchmark",
   "kind": "experiment",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Complete MIMIC-III sepsis experiment suite: offline clinical benchmark configs, group defaults, ICU environment hooks, timeseries data module, early prediction & reward shaping evaluators, and clinical agreement plotters.",
   "author": {
     "name": "Theta Research"
