@@ -23,7 +23,8 @@ from src.app.core.provider_catalog import ProviderCatalog, content_hash, file_ha
 from src.app.core.provider_loader import load_capability, load_module, provider_export, resolve_provider
 from src.app.workspace import WorkspacePaths
 
-IDS = [json.loads(p.read_text())['id'] for p in sorted(ROOT.glob('*/*/.theta_component.json'))]
+IDS = [meta['id'] for meta in (json.loads(p.read_text()) for p in sorted(ROOT.glob('*/*/.theta_component.json')))
+       if meta.get('storage_version') == 3]
 
 
 @pytest.fixture(scope='session')
@@ -506,3 +507,161 @@ def test_native_sb3_replicates_record_episodes(native,monkeypatch):
         assert all(len(event['episode_outcomes'])==2 and event['deterministic_actions'] for event in events)
         assert [event['evaluation_seed'] for event in events]==[100,101]
     assert all(point['n']==2 for point in execution.aggregate('m'))
+
+
+# BlendRL and the basic models inside the sb3-suite policy adapters (moved from the IDE suite,
+# which no longer depends on installed research packages).
+BLEND_CFG = {'architecture': 'blendrl', 'actor_mode': 'hybrid', 'blend_function': 'softmax',
+             'blender': {'mode': 'neural', 'model': {'name': 'basics/dnn', 'hidden_sizes': [16, 16]}},
+             'neural': {'type': 'dnn', 'hidden_sizes': [32, 32]},
+             'symbolic': {'type': 'nsfr', 'rules': 'variant2',
+                          'observation_builder': 'export://gym_classic_control/cartpole_symbolic_observation'}}
+CARTPOLE = {'env_name': 'cartpole', 'action_meanings': ['left', 'right']}
+
+
+def package_module(native, package_id, relative):
+    return load_module(ProviderCatalog(native.paths).package(package_id), relative, paths=native.paths)
+
+
+def sb3_policies(native):
+    pytest.importorskip('stable_baselines3')
+    return package_module(native, 'sb3-suite', 'theta_sb3_policy.py')
+
+
+def bare_blender(native):
+    BlenderActorCritic = package_module(native, 'blendrl', 'agents/blender_agent.py').BlenderActorCritic
+    import torch
+    model = BlenderActorCritic.__new__(BlenderActorCritic)
+    torch.nn.Module.__init__(model)
+    return model
+
+
+def test_blendrl_uses_its_configured_symbolic_observation_builder(native):
+    import torch
+    model = bare_blender(native)
+    obs = torch.tensor([[1.0, 2.0, 3.0]])
+    model.cfg = {'model': {'symbolic': {'observation_builder': lambda x: x.unsqueeze(1) * 7}}}
+    torch.testing.assert_close(model.build_logic_observation(obs), obs.unsqueeze(1) * 7)
+
+    class Actor(torch.nn.Module):
+        def get_q_values(self, neural_state, logic_state):
+            return logic_state[:, 0]
+
+    model.actor = Actor()
+    torch.testing.assert_close(model.get_q_values(obs), obs * 7)
+    model.cfg = {'model': {}, 'env': {}}
+    with pytest.raises(ValueError, match='symbolic observation builder'):
+        model.build_logic_observation(obs)
+
+
+def test_blendrl_rejects_an_engine_specific_configuration(native):
+    model = bare_blender(native)
+    model.cfg = {'model': {}}
+    model.blend_function = 'gumbel_softmax'
+    with pytest.raises(ValueError, match='requires blend_function=softmax'):
+        model.validate_engine_compatibility('sb3', 'on_policy')
+    model.validate_engine_compatibility('another_engine', 'on_policy')
+
+
+def test_blendrl_optimizer_rates_allow_null_model_defaults_and_agent_fallback(native):
+    import torch
+    model = bare_blender(native)
+    model.cfg = {'model': {'logic_lr': None, 'blender_lr': .003}, 'agent': {'logic_lr': .002}}
+    model.module_types = ['logic', 'neural']
+    model.actor = torch.nn.Module()
+    model.actor.policy_modules = torch.nn.ModuleList([torch.nn.Linear(2, 2), torch.nn.Linear(2, 2)])
+    model.actor.blender = torch.nn.Linear(2, 2)
+    assert [g['lr'] for g in model.configure_optimizer_groups(.001)] == pytest.approx([.002, .001, .003])
+
+
+@pytest.mark.parametrize('actor_mode', ['hybrid', 'logic', 'neural'])
+def test_sb3_ppo_trains_and_reloads_blendrl(native, tmp_path, actor_mode):
+    import gymnasium as gym
+    import torch
+    from stable_baselines3 import PPO
+    policy = sb3_policies(native).ThetaActorCriticPolicy
+    DNNModel = package_module(native, 'dnn', 'dnn_model.py').DNNModel
+    cfg = {'model': {**BLEND_CFG, 'actor_mode': actor_mode}, 'agent': {}}
+    env = gym.make('CartPole-v1')
+    model = PPO(policy, env, n_steps=8, batch_size=4, n_epochs=1, seed=4,
+                policy_kwargs={'theta_config': cfg, 'theta_model': 'blendrl', **CARTPOLE})
+    selected = model.policy.theta_model_module
+    assert type(selected).__name__ == 'BlenderActorCritic'
+    assert selected.module_types == ['logic', 'neural']
+    neural = selected.policy_modules[1]
+    assert isinstance(neural, DNNModel) and isinstance(selected.blender, DNNModel)
+    assert neural.network[0].out_features == 32 and selected.blender.network[0].out_features == 16
+    before = {name: value.detach().clone() for name, value in selected.named_parameters()}
+    model.learn(total_timesteps=16)
+    after = dict(selected.named_parameters())
+    if actor_mode == 'hybrid':
+        assert any(not torch.equal(before[n], after[n]) for n in before if n.startswith('policy_modules.1.'))
+        assert any(not torch.equal(before[n], after[n]) for n in before if n.startswith('blender.'))
+    obs = torch.tensor([[0., 0., -0.1, 0.]], dtype=torch.float32)
+    probs_before = selected.get_action_probs(obs).detach()
+    model.save(tmp_path / 'blendrl.zip')
+    restored = PPO.load(tmp_path / 'blendrl.zip', env=env)
+    assert type(restored.policy.theta_model_module) is type(selected)
+    torch.testing.assert_close(restored.policy.theta_model_module.get_action_probs(obs), probs_before)
+    env.close()
+
+
+def test_sb3_dqn_uses_selected_model_q_values_and_reloads(native, tmp_path):
+    import gymnasium as gym
+    import torch
+    from stable_baselines3 import DQN
+    policy = sb3_policies(native).ThetaDQNPolicy
+    MLPQNetwork = package_module(native, 'mlp', 'mlp_model.py').MLPQNetwork
+    cfg = {'model': {'architecture': 'basics/mlp', 'hidden_dims': [11, 7], 'activation': 'relu'}}
+    env = gym.make('CartPole-v1')
+    model = DQN(policy, env, buffer_size=40, learning_starts=0, batch_size=4, train_freq=1, seed=3,
+                policy_kwargs={'theta_config': cfg, 'theta_model': 'basics/mlp', **CARTPOLE})
+    selected = model.policy.q_net.theta_model_module
+    assert isinstance(selected, MLPQNetwork)
+    assert [selected.network[0].out_features, selected.network[2].out_features] == [11, 7]
+    obs = torch.tensor([[0., 0., -0.1, 0.]], dtype=torch.float32)
+    torch.testing.assert_close(model.policy.q_net(obs), selected.get_q_values(obs))
+    before = {name: value.detach().clone() for name, value in selected.named_parameters()}
+    model.learn(total_timesteps=12)
+    assert any(not torch.equal(before[name], value) for name, value in selected.named_parameters())
+    values = selected.get_q_values(obs).detach()
+    model.save(tmp_path / 'dqn.zip')
+    restored = DQN.load(tmp_path / 'dqn.zip', env=env)
+    assert isinstance(restored.policy.q_net.theta_model_module, MLPQNetwork)
+    torch.testing.assert_close(restored.policy.q_net(obs), values)
+    env.close()
+
+
+def test_sb3_dqn_uses_blendrl_to_build_symbolic_observations(native):
+    import gymnasium as gym
+    import torch
+    from stable_baselines3 import DQN
+    adapter = sb3_policies(native).ThetaDQNPolicy
+    env = gym.make('CartPole-v1')
+    model = DQN(adapter, env, buffer_size=40, learning_starts=0, batch_size=4, train_freq=1,
+                policy_kwargs={'theta_config': {'model': dict(BLEND_CFG)}, 'theta_model': 'blendrl', **CARTPOLE})
+    selected = model.policy.q_net.theta_model_module
+    assert type(selected).__name__ == 'BlenderActorCritic'
+    obs = torch.tensor([[0., 0., -0.1, 0.]], dtype=torch.float32)
+    torch.testing.assert_close(model.policy.q_net(obs), selected.get_q_values(obs))
+    model.learn(total_timesteps=8)
+    env.close()
+
+
+def test_blendrl_routing_monitor_reports_experts_and_keeps_gradients_usable(native):
+    import gymnasium as gym
+    import torch
+    module = sb3_policies(native)
+    cfg = {'model': {**BLEND_CFG, 'logic_lr': .002, 'blender_lr': .003}}
+    env = gym.make('CartPole-v1')
+    model = module.ThetaPPO(module.ThetaActorCriticPolicy, env, learning_rate=.001, n_steps=8, batch_size=4, n_epochs=1,
+                            policy_kwargs={'theta_config': cfg, 'theta_model': 'blendrl', **CARTPOLE})
+    selected = model.policy.theta_model_module
+    metrics, samples = selected.collect_monitoring(torch.tensor([[0., 0., -.1, 0.], [0., 0., .1, 0.]]))
+    assert samples['weights'].shape == (2, 2)
+    assert 'blend/logic/weight_mean' in metrics
+    assert 0 <= metrics['blend/logic_0/coverage'] <= 1
+    assert 'blend/agreement/logic_0__neural_1/top_action' in metrics
+    assert not selected.actor._capture_experts
+    model.learn(total_timesteps=8)
+    env.close()

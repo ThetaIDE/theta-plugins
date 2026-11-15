@@ -13,8 +13,13 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def inventory(root=ROOT):
-    """Only maintained top-level records; nested suite content is not a package."""
-    return [(p.parent, json.loads(p.read_text())) for p in sorted(root.glob('*/*/.theta_component.json'))]
+    """Maintained top-level package-format-3 records; nested suite content is not a package.
+
+    Sources still at an older storage version (third-party plugins awaiting their author) are
+    neither validated nor built.
+    """
+    records = [(p.parent, json.loads(p.read_text())) for p in sorted(root.glob('*/*/.theta_component.json'))]
+    return [(source, meta) for source, meta in records if meta.get('storage_version') == 3]
 
 
 def payload_files(source, meta):
