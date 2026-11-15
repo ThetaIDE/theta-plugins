@@ -468,7 +468,7 @@ def test_native_cartpole_sb3_objective_worker(native,tmp_path):
         'variability':{'training_seeds':[1,2],'parallel_runs':2,'evaluation_seed':10}})
     OmegaConf.save(cfg,tmp_path/'test.yaml')
     execute(native,['-m','src.app.pipeline.repeated_task','--config-path',str(tmp_path),'--config-name','test'])
-    path=next(native.paths.root.glob('results/logs/g/e/m/version_execution_*/objective.json'))
+    path=next(native.paths.results.glob('logs/g/e/m/version_execution_*/objective.json'))
     manifest=json.loads(path.read_text())
     assert len(manifest['runs'])==2
     assert all(run['status']=='completed' for run in manifest['runs'])
@@ -496,7 +496,7 @@ def test_native_sb3_replicates_record_episodes(native,monkeypatch):
         'storage_url':None,'is_sweep':False,'is_interactive':True}
     monkeypatch.chdir(native.paths.root)
     run_execution(cfg,context,make_plan(cfg,context))
-    execution=ExecutionData(next(native.paths.root.glob('results/executions/replicates/e/*/manifest.json')))
+    execution=ExecutionData(next(native.paths.results.glob('executions/replicates/e/*/manifest.json')))
     assert len(execution.runs())==2
     for run in execution.runs():
         assert run['status']=='completed'

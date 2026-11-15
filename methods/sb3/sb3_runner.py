@@ -242,7 +242,7 @@ def execute(cfg: DictConfig, context):
 
     hydra_cfg = HydraConfig.get()
     is_sweep = hydra_cfg.mode.name == "MULTIRUN"
-    ckpt_dir = Path("results/checkpoints") / group / exp_id / agent_name.replace("/", "_")
+    ckpt_dir = WorkspacePaths.for_process().results / "checkpoints" / group / exp_id / agent_name.replace("/", "_")
     if cfg.get("variability_run_id"):
         ckpt_dir = ckpt_dir / str(cfg.get("variability_version", "version_0"))
     if is_sweep:
