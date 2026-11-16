@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import lightning as L
 import numpy as np
@@ -45,9 +45,6 @@ class TabularDataset(Dataset):
 class TabularDataModule(L.LightningDataModule, BaseDataModule):
     """General tabular dataset loader supporting CSV, NPZ, and NPY files."""
 
-    @classmethod
-    def get_supported_paradigms(cls) -> List[str]:
-        return ["supervised", "offline_rl", "unsupervised"]
 
     def __init__(
         self,

@@ -2,7 +2,7 @@
   "id": "tabular-data",
   "name": "Tabular Data Module",
   "kind": "datamodule",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "General tabular dataset loader supporting CSV, NPZ, and NPY files with automated train/val/test splitting and standardization.",
   "author": {
     "name": "Theta-IDE Team"
@@ -12,11 +12,6 @@
   "compatibility": {
     "theta": ">=2.0.0"
   },
-  "paradigms": [
-    "supervised",
-    "offline_rl",
-    "unsupervised"
-  ],
   "config_paths": [
     "data/thetalib/tabular_data.yaml"
   ],
@@ -58,6 +53,17 @@
       "entry_point": "tabular_data.py:TabularDataModule",
       "aliases": [
         "TabularDataModule"
+      ],
+      "requires": [
+        {
+          "level": "block",
+          "config": "paradigm",
+          "in": [
+            "supervised",
+            "offline_rl",
+            "unsupervised"
+          ]
+        }
       ]
     }
   ],

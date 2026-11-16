@@ -17,10 +17,6 @@
     ],
     "pip": []
   },
-  "paradigms": [
-    "supervised",
-    "offline_rl"
-  ],
   "parameter_schema": {
     "type": "object",
     "properties": {
@@ -92,7 +88,17 @@
       "aliases": [
         "mimic"
       ],
-      "resource_root": "environment"
+      "resource_root": "environment",
+      "requires": [
+        {
+          "level": "block",
+          "config": "paradigm",
+          "in": [
+            "supervised",
+            "offline_rl"
+          ]
+        }
+      ]
     }
   ],
   "payload": {

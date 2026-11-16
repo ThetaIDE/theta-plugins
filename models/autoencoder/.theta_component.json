@@ -2,15 +2,11 @@
   "id": "autoencoder",
   "name": "Dense & Sequence Autoencoders",
   "kind": "model",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Dense and sequence autoencoder architectures for unsupervised representation learning.",
   "author": {
     "name": "Theta-IDE Team"
   },
-  "paradigms": [
-    "unsupervised",
-    "supervised"
-  ],
   "config_path": "model/basics/autoencoder.yaml",
   "config_paths": [
     "model/basics/autoencoder.yaml",
@@ -65,6 +61,16 @@
         "sequence_autoencoder",
         "seq_autoencoder",
         "basics/autoencoder"
+      ],
+      "requires": [
+        {
+          "level": "block",
+          "config": "paradigm",
+          "in": [
+            "unsupervised",
+            "supervised"
+          ]
+        }
       ]
     },
     {
@@ -74,6 +80,16 @@
       "aliases": [
         "mlp_autoencoder",
         "basics/dense_autoencoder"
+      ],
+      "requires": [
+        {
+          "level": "block",
+          "config": "paradigm",
+          "in": [
+            "unsupervised",
+            "supervised"
+          ]
+        }
       ]
     },
     {

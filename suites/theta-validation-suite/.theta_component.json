@@ -2,7 +2,7 @@
   "id": "theta-validation-suite",
   "name": "Theta Validation Suite",
   "kind": "suite",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Online-RL experiment and component conformance recipes for ThetaIDE Basics.",
   "author": {
     "name": "Theta-IDE Team"
@@ -21,9 +21,6 @@
     ],
     "pip": []
   },
-  "paradigms": [
-    "online_rl"
-  ],
   "config_paths": [
     "experiment/theta_validation/_base.yaml",
     "experiment/theta_validation/failure/checkpoint_conflict.yaml",
@@ -45,39 +42,30 @@
       {
         "id": "gym_classic_control/cartpole",
         "title": "CartPole live environment",
-        "description": "The Basic Suite environment must expose an online-RL CartPole environment.",
+        "description": "The Basic Suite environment must expose the CartPole live environment.",
         "config_path": "env/gym_classic_control/cartpole.yaml",
         "required": {
-          "env_id": "CartPole-v1",
-          "compatible_paradigms": [
-            "online_rl"
-          ]
+          "env_id": "CartPole-v1"
         }
       },
       {
         "id": "sb3/ppo",
         "title": "SB3 PPO algorithm",
-        "description": "PPO must declare its algorithm capability, execution backend and online-RL compatibility.",
+        "description": "PPO must declare its algorithm capability and execution backend.",
         "config_path": "agent/sb3/ppo.yaml",
         "required": {
           "algorithm": "sb3/ppo",
-          "backend": "sb3",
-          "compatible_paradigms": [
-            "online_rl"
-          ]
+          "backend": "sb3"
         }
       },
       {
         "id": "d3rlpy/cql",
         "title": "d3rlpy CQL algorithm",
-        "description": "CQL must declare its algorithm capability, execution backend and offline-RL compatibility.",
+        "description": "CQL must declare its algorithm capability and execution backend.",
         "config_path": "agent/d3rlpy/cql.yaml",
         "required": {
           "algorithm": "d3rlpy/cql",
-          "backend": "d3rlpy",
-          "compatible_paradigms": [
-            "offline_rl"
-          ]
+          "backend": "d3rlpy"
         }
       },
       {
@@ -117,7 +105,7 @@
         "expectation": "blocked",
         "execution": "preflight",
         "blocked_reason": "The online-RL paradigm requires methods.",
-        "expected_error": "requires 'methods'"
+        "expected_error": "declares no enabled methods"
       },
       {
         "id": "missing-agent",
@@ -146,8 +134,8 @@
         "experiment": "theta_validation/failure/incompatible_cql",
         "expectation": "blocked",
         "execution": "preflight",
-        "blocked_reason": "CQL is compatible with offline RL only.",
-        "expected_error": "not allowed in paradigm 'online_rl'"
+        "blocked_reason": "CQL declares offline RL as its only paradigm.",
+        "expected_error": "requires paradigm in ['offline_rl']; got 'online_rl'"
       },
       {
         "id": "incompatible-iql",
@@ -156,8 +144,8 @@
         "experiment": "theta_validation/failure/incompatible_iql",
         "expectation": "blocked",
         "execution": "preflight",
-        "blocked_reason": "IQL is compatible with offline RL only.",
-        "expected_error": "not allowed in paradigm 'online_rl'"
+        "blocked_reason": "IQL declares offline RL as its only paradigm.",
+        "expected_error": "requires paradigm in ['offline_rl']; got 'online_rl'"
       },
       {
         "id": "incompatible-td3-bc",
@@ -166,8 +154,8 @@
         "experiment": "theta_validation/failure/incompatible_td3_bc",
         "expectation": "blocked",
         "execution": "preflight",
-        "blocked_reason": "TD3+BC is compatible with offline RL only.",
-        "expected_error": "not allowed in paradigm 'online_rl'"
+        "blocked_reason": "TD3+BC declares offline RL as its only paradigm.",
+        "expected_error": "requires paradigm in ['offline_rl']; got 'online_rl'"
       },
       {
         "id": "incompatible-bc",
@@ -176,8 +164,8 @@
         "experiment": "theta_validation/failure/incompatible_bc",
         "expectation": "blocked",
         "execution": "preflight",
-        "blocked_reason": "Behavior cloning is compatible with offline RL only.",
-        "expected_error": "not allowed in paradigm 'online_rl'"
+        "blocked_reason": "Behavior cloning declares offline RL as its only paradigm.",
+        "expected_error": "requires paradigm in ['offline_rl']; got 'online_rl'"
       },
       {
         "id": "unknown-agent",

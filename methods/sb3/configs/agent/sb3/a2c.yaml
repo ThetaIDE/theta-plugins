@@ -1,5 +1,4 @@
 # Stable-Baselines3 A2C (Advantage Actor Critic)
-compatible_paradigms: [online_rl]
 algorithm: sb3/a2c
 backend: sb3
 policy: MlpPolicy

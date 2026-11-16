@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import lightning as L
 import numpy as np
@@ -34,9 +34,6 @@ class OfflineReplayDataset(Dataset):
 class ReplayBufferDataModule(L.LightningDataModule, BaseDataModule):
     """General transition replay loader and chunk reader for offline reinforcement learning."""
 
-    @classmethod
-    def get_supported_paradigms(cls) -> List[str]:
-        return ["offline_rl"]
 
     def __init__(
         self,

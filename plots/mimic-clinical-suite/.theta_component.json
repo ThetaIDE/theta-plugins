@@ -11,10 +11,6 @@
   "compatibility": {
     "theta": ">=2.0.0"
   },
-  "paradigms": [
-    "supervised",
-    "offline_rl"
-  ],
   "config_paths": [
     "plot/mimic/clinical.yaml",
     "plot/mimic/clinical_alignment.yaml",

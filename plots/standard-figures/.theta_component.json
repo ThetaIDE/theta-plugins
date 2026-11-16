@@ -2,7 +2,7 @@
   "id": "standard-figures",
   "name": "Standard Reinforcement Learning Figures",
   "kind": "plotter",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Universal convergence curves, policy and value loss trajectories, and benchmark summary reports.",
   "author": {
     "name": "Theta-IDE Team"
@@ -11,12 +11,6 @@
   "compatibility": {
     "theta": ">=2.0.0"
   },
-  "paradigms": [
-    "online_rl",
-    "offline_rl",
-    "supervised",
-    "unsupervised"
-  ],
   "config_paths": [
     "plot/thetalib/convergence.yaml",
     "plot/thetalib/losses.yaml",

@@ -12,10 +12,6 @@
   "compatibility": {
     "theta": ">=2.0.0"
   },
-  "paradigms": [
-    "supervised",
-    "offline_rl"
-  ],
   "config_paths": [
     "eval/mimic/early_prediction.yaml"
   ],

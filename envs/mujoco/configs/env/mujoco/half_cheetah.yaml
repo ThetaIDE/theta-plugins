@@ -1,5 +1,4 @@
 name: mujoco/half_cheetah
-compatible_paradigms: [online_rl]
 monitor_metric: "eval/reward"
 preprocess_on_load: false
 env_id: HalfCheetah-v5

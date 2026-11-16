@@ -1,5 +1,4 @@
 # Stable-Baselines3 SAC (Soft Actor Critic)
-compatible_paradigms: [online_rl]
 algorithm: sb3/sac
 backend: sb3
 policy: MlpPolicy

@@ -2,7 +2,7 @@
   "id": "thetalib",
   "name": "ThetaLib Core Foundation Suite",
   "kind": "suite",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Foundational library plugin for Theta-IDE: universal convergence/loss/report figures and core data loaders (image, replay buffer, tabular).",
   "author": {
     "name": "Theta-IDE Team"
@@ -11,12 +11,6 @@
   "compatibility": {
     "theta": ">=2.0.0"
   },
-  "paradigms": [
-    "online_rl",
-    "offline_rl",
-    "supervised",
-    "unsupervised"
-  ],
   "config_paths": [],
   "dependencies": {
     "components": [

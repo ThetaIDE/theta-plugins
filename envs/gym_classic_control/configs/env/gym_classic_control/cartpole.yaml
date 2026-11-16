@@ -1,11 +1,9 @@
 name: gym_classic_control/cartpole
-compatible_paradigms: [online_rl, offline_rl]
 monitor_metric: "eval/reward"
 preprocess_on_load: false
 env_id: CartPole-v1
 symbolic_name: cartpole
 action_meanings: [left, right]
-symbolic_observation_builder: export://gym_classic_control/cartpole_symbolic_observation
 num_envs: 4
 num_steps: 500
 gamma: 0.99

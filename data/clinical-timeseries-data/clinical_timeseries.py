@@ -59,9 +59,6 @@ def collate_clinical_batch(batch: List[Tuple[torch.Tensor, torch.Tensor]]):
 class ClinicalTimeseriesDataModule(L.LightningDataModule, BaseDataModule):
     """DataModule managing multi-variate ICU/EHR timeseries windowing, imputation, and cohort splits."""
 
-    @classmethod
-    def get_supported_paradigms(cls) -> List[str]:
-        return ["supervised", "offline_rl"]
 
     def __init__(
         self,

@@ -1,6 +1,5 @@
 name: mnist
 env_id: mnist
-compatible_paradigms: [supervised, unsupervised]
 environment_source: static_dataset
 monitor_metric: "val/loss"
 dataset_name: digits.npz

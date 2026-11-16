@@ -2,7 +2,7 @@
   "id": "d3rlpy-suite",
   "name": "d3rlpy Offline RL Suite",
   "kind": "method",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Standard offline reinforcement learning algorithms (CQL, IQL, TD3+BC, BC) powered by d3rlpy.",
   "author": "Takuma Seno & d3rlpy Contributors",
   "tags": [
@@ -30,13 +30,7 @@
       "entry_point": "d3rlpy_backend.py:execute",
       "execution_contract": 1,
       "backend": "d3rlpy",
-      "paradigms": [
-        "offline_rl"
-      ],
       "execution_features": {
-        "input_types": [
-          "dataset_path"
-        ],
         "evaluation": "provider",
         "resume_modes": [
           "inference"
@@ -51,7 +45,21 @@
       "resource_hints": {
         "accelerator": false
       },
-      "aliases": []
+      "aliases": [],
+      "requires": [
+        {
+          "level": "block",
+          "config": "paradigm",
+          "in": [
+            "offline_rl"
+          ]
+        },
+        {
+          "level": "block",
+          "config": "data_module",
+          "present": false
+        }
+      ]
     },
     {
       "id": "d3rlpy/cql",
@@ -59,13 +67,7 @@
       "entry_point": "d3rlpy_backend.py:execute",
       "execution_contract": 1,
       "backend": "d3rlpy",
-      "paradigms": [
-        "offline_rl"
-      ],
       "execution_features": {
-        "input_types": [
-          "dataset_path"
-        ],
         "evaluation": "provider",
         "resume_modes": [
           "inference"
@@ -80,7 +82,21 @@
       "resource_hints": {
         "accelerator": false
       },
-      "aliases": []
+      "aliases": [],
+      "requires": [
+        {
+          "level": "block",
+          "config": "paradigm",
+          "in": [
+            "offline_rl"
+          ]
+        },
+        {
+          "level": "block",
+          "config": "data_module",
+          "present": false
+        }
+      ]
     },
     {
       "id": "d3rlpy/iql",
@@ -88,13 +104,7 @@
       "entry_point": "d3rlpy_backend.py:execute",
       "execution_contract": 1,
       "backend": "d3rlpy",
-      "paradigms": [
-        "offline_rl"
-      ],
       "execution_features": {
-        "input_types": [
-          "dataset_path"
-        ],
         "evaluation": "provider",
         "resume_modes": [
           "inference"
@@ -109,7 +119,21 @@
       "resource_hints": {
         "accelerator": false
       },
-      "aliases": []
+      "aliases": [],
+      "requires": [
+        {
+          "level": "block",
+          "config": "paradigm",
+          "in": [
+            "offline_rl"
+          ]
+        },
+        {
+          "level": "block",
+          "config": "data_module",
+          "present": false
+        }
+      ]
     },
     {
       "id": "d3rlpy/td3_bc",
@@ -117,13 +141,7 @@
       "entry_point": "d3rlpy_backend.py:execute",
       "execution_contract": 1,
       "backend": "d3rlpy",
-      "paradigms": [
-        "offline_rl"
-      ],
       "execution_features": {
-        "input_types": [
-          "dataset_path"
-        ],
         "evaluation": "provider",
         "resume_modes": [
           "inference"
@@ -138,17 +156,37 @@
       "resource_hints": {
         "accelerator": false
       },
-      "aliases": []
+      "aliases": [],
+      "requires": [
+        {
+          "level": "block",
+          "config": "paradigm",
+          "in": [
+            "offline_rl"
+          ]
+        },
+        {
+          "level": "block",
+          "config": "data_module",
+          "present": false
+        }
+      ]
     },
     {
       "id": "d3rlpy/vector",
       "kind": "model",
       "entry_point": "d3rlpy_backend.py:create_encoder",
       "backend": "d3rlpy",
-      "paradigms": [
-        "offline_rl"
-      ],
-      "aliases": []
+      "aliases": [],
+      "requires": [
+        {
+          "level": "block",
+          "config": "paradigm",
+          "in": [
+            "offline_rl"
+          ]
+        }
+      ]
     }
   ],
   "payload": {

@@ -1,5 +1,4 @@
 # Stable-Baselines3 DQN (Deep Q-Network)
-compatible_paradigms: [online_rl]
 algorithm: sb3/dqn
 backend: sb3
 policy: MlpPolicy

@@ -1,6 +1,5 @@
 name: digits
 env_id: digits
-compatible_paradigms: [supervised, unsupervised]
 environment_source: static_dataset
 monitor_metric: "val/loss"
 dataset_name: digits.npz

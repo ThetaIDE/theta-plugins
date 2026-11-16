@@ -6,7 +6,7 @@ and tensor normalization for any image-based Gymnasium environment or offline da
 from __future__ import annotations
 
 import logging
-from typing import Any, List, Optional, Tuple
+from typing import Any, Optional, Tuple
 
 import gymnasium as gym
 import lightning as L
@@ -47,9 +47,6 @@ class ImageObservationDataset(Dataset):
 class ImageDataModule(L.LightningDataModule, BaseDataModule):
     """General-purpose DataModule for image observations (Atari, DOOM, Procgen, Crafter, Robotics)."""
 
-    @classmethod
-    def get_supported_paradigms(cls) -> List[str]:
-        return ["online_rl", "offline_rl", "supervised"]
 
     def __init__(
         self,

@@ -2,16 +2,11 @@
   "id": "transformer",
   "name": "Transformer Policy & Attention Networks",
   "kind": "model",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Multi-head self-attention and cross-attention transformer policy architectures with temporal attention pooling.",
   "author": {
     "name": "Theta-IDE Team"
   },
-  "paradigms": [
-    "online_rl",
-    "offline_rl",
-    "supervised"
-  ],
   "config_path": "model/basics/transformer.yaml",
   "config_paths": [
     "model/basics/transformer.yaml"
@@ -53,6 +48,17 @@
       "aliases": [
         "sepsis_transformer",
         "basics/transformer"
+      ],
+      "requires": [
+        {
+          "level": "block",
+          "config": "paradigm",
+          "in": [
+            "online_rl",
+            "offline_rl",
+            "supervised"
+          ]
+        }
       ]
     },
     {
@@ -62,6 +68,17 @@
       "aliases": [
         "cross_attention_transformer",
         "sepsis_cross_attention"
+      ],
+      "requires": [
+        {
+          "level": "block",
+          "config": "paradigm",
+          "in": [
+            "online_rl",
+            "offline_rl",
+            "supervised"
+          ]
+        }
       ]
     }
   ],

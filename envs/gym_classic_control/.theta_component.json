@@ -2,7 +2,7 @@
   "id": "gym_classic_control",
   "name": "Gymnasium Classic Control",
   "kind": "env",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Standard Gymnasium classic control environments: CartPole, MountainCar, Pendulum, and Acrobot.",
   "author": {
     "name": "Theta-IDE Team"
@@ -170,7 +170,31 @@
         "acrobot",
         "gym_classic_control/acrobot"
       ],
-      "resource_root": "."
+      "resource_root": ".",
+      "requires": [
+        {
+          "level": "block",
+          "config": "paradigm",
+          "in": [
+            "online_rl",
+            "offline_rl"
+          ]
+        },
+        {
+          "level": "block",
+          "config": "paradigm",
+          "in": [
+            "online_rl"
+          ],
+          "when": {
+            "env.env_id": [
+              "Acrobot-v1",
+              "Pendulum-v1"
+            ]
+          },
+          "message": "Acrobot and Pendulum have no offline datasets; use them in online_rl."
+        }
+      ]
     },
     {
       "id": "cartpole",
@@ -179,6 +203,16 @@
       "resource_root": "resources/cartpole",
       "aliases": [
         "gym_classic_control/cartpole"
+      ],
+      "requires": [
+        {
+          "level": "block",
+          "config": "paradigm",
+          "in": [
+            "online_rl",
+            "offline_rl"
+          ]
+        }
       ]
     }
   ],

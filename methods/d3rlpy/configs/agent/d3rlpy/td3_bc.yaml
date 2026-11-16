@@ -1,4 +1,3 @@
-compatible_paradigms: [offline_rl]
 algorithm: d3rlpy/td3_bc
 backend: d3rlpy
 learning_rate: 3e-4
