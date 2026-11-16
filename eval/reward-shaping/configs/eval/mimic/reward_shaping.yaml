@@ -4,5 +4,6 @@ lambda_coef: 1.0
 gamma: 0.99
 window_hours: 12
 use_volatility: true
-ep_ckpt_dir: "results/checkpoints/early_prediction"
+ep_ckpt_dir: null
+cql_ckpt_dir: null
 ep_architecture: null

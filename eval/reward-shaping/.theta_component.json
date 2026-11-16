@@ -12,9 +12,6 @@
   "compatibility": {
     "theta": ">=2.0.0"
   },
-  "paradigms": [
-    "offline_rl"
-  ],
   "config_paths": [
     "eval/mimic/reward_shaping.yaml"
   ],
@@ -34,10 +31,21 @@
         "type": "boolean"
       },
       "ep_ckpt_dir": {
-        "type": "string"
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "EP checkpoint directory; relative to the workspace. Null uses the workspace's results/checkpoints/early_prediction."
       },
       "ep_architecture": {
         "type": "string"
+      },
+      "cql_ckpt_dir": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "CQL checkpoint file or directory for V(s); required by V-augmented EP models."
       }
     }
   },

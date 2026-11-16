@@ -15,7 +15,6 @@ References:
   - Wiewiora (2003). "Potential-based shaping and Q-value initialization."
 """
 
-import os
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -26,6 +25,17 @@ import torch.nn as nn
 
 
 from src.app.api.evaluation import register_evaluator
+from src.app.api.workspace import WorkspacePaths
+
+
+def _results():
+    return WorkspacePaths.for_process().results
+
+
+def _workspace_path(value):
+    """A configured path; relative paths resolve from the workspace, not the working directory."""
+    path = Path(value).expanduser()
+    return path if path.is_absolute() else WorkspacePaths.for_process().root / path
 
 
 @register_evaluator("reward_shaping", "EPRewardShaper")
@@ -36,7 +46,11 @@ class EPRewardShaper:
     in the offline dataset and uses it as a potential function for reward shaping.
 
     Args:
-        ep_ckpt_dir: Directory containing EP model checkpoints (.pt files)
+        ep_ckpt_dir: Directory containing EP model checkpoints (.pt files); relative paths
+                     resolve from the workspace. Default: the workspace's
+                     results/checkpoints/early_prediction.
+        cql_ckpt_dir: CQL checkpoint (file or directory with best_model*.ckpt) for V(s),
+                      required by V-augmented EP models.
         device: Torch device
         lambda_coef: Shaping coefficient (default: 1.0)
         gamma: Discount factor (default: 0.99)
@@ -49,6 +63,7 @@ class EPRewardShaper:
     def __init__(
         self,
         ep_ckpt_dir: str | None = None,
+        cql_ckpt_dir: str | None = None,
         device: torch.device | None = None,
         lambda_coef: float = 1.0,
         gamma: float = 0.99,
@@ -57,23 +72,8 @@ class EPRewardShaper:
         ep_architecture: str | None = None,
         **kwargs,
     ):
-        from omegaconf import DictConfig
-
-        if isinstance(ep_ckpt_dir, (dict, DictConfig)):
-            cfg = ep_ckpt_dir
-            rs_cfg = {}
-            if hasattr(cfg, "env") and cfg.env is not None and hasattr(cfg.env, "get"):
-                rs_cfg = cfg.env.get("reward_shaping", {}) or {}
-            elif hasattr(cfg, "get"):
-                rs_cfg = cfg.get("reward_shaping", {}) or {}
-            ep_ckpt_dir = rs_cfg.get("ep_ckpt_dir", "results/checkpoints/early_prediction")
-            lambda_coef = float(rs_cfg.get("lambda_coef", lambda_coef))
-            gamma = float(rs_cfg.get("gamma", gamma))
-            window_hours = int(rs_cfg.get("window_hours", window_hours))
-            use_volatility = bool(rs_cfg.get("use_volatility", use_volatility))
-            ep_architecture = rs_cfg.get("ep_arch", rs_cfg.get("ep_architecture", ep_architecture))
-
-        self.ep_ckpt_dir = Path(ep_ckpt_dir or "results/checkpoints/early_prediction")
+        self.ep_ckpt_dir = _workspace_path(ep_ckpt_dir) if ep_ckpt_dir else _results() / "checkpoints" / "early_prediction"
+        self.cql_ckpt_dir = _workspace_path(cql_ckpt_dir) if cql_ckpt_dir else None
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.lambda_coef = lambda_coef
         self.gamma = gamma
@@ -276,7 +276,7 @@ class EPRewardShaper:
 
         Args:
             reader: DatasetReader with .obs, .next_obs, .rewards, .dones attributes
-            cfg: Optional Hydra config (used to get gamma if available)
+            cfg: Unused; the shaper's own parameters configure it.
         """
         import torch
 
@@ -289,8 +289,6 @@ class EPRewardShaper:
             return
 
         gamma = self.gamma
-        if cfg is not None:
-            gamma = getattr(getattr(cfg, "env", None), "gamma", gamma)
 
         n_transitions = len(reader.obs)
         print(f"EPRewardShaper: Computing potentials for {n_transitions} transitions...")
@@ -308,7 +306,7 @@ class EPRewardShaper:
         # Pre-compute V(s) if models expect it and a CQL checkpoint is available
         v_all = None
         if self._models_use_v():
-            v_all = self._precompute_v_values(reader, cfg)
+            v_all = self._precompute_v_values(reader)
 
         # Compute potentials for each trajectory
         all_potentials = np.zeros(n_transitions, dtype=np.float32)
@@ -360,19 +358,12 @@ class EPRewardShaper:
             f"min={shaped_bonus.min():.4f}, max={shaped_bonus.max():.4f}"
         )
 
-    def _precompute_v_values(self, reader, cfg=None) -> np.ndarray | None:
-        """Pre-compute V(s) = max_a Q(s,a) from a CQL checkpoint for V-augmented EP models.
+    def _precompute_v_values(self, reader) -> np.ndarray | None:
+        """Pre-compute V(s) = max_a Q(s,a) from the cql_ckpt_dir checkpoint for V-augmented EP models."""
+        if self.cql_ckpt_dir is None:
+            raise ValueError("EP models require V(s): set the evaluator's cql_ckpt_dir.")
 
-        Requires a valid CQL checkpoint path provided via cfg or EP_SHAPE_CQL_CKPT.
-        """
-        rs_cfg = cfg.env.get("reward_shaping", {}) if cfg and hasattr(cfg, "env") else {}
-        cql_ckpt_dir = rs_cfg.get("cql_ckpt_dir") or os.environ.get("EP_SHAPE_CQL_CKPT")
-        if not cql_ckpt_dir:
-            raise ValueError(
-                "EP models require V(s), but cql_ckpt_dir config / EP_SHAPE_CQL_CKPT environment variable is not set."
-            )
-
-        ckpt_path = Path(cql_ckpt_dir)
+        ckpt_path = self.cql_ckpt_dir
         cql_ckpt_path = None
 
         if ckpt_path.is_file() and ckpt_path.suffix == ".ckpt":
@@ -420,35 +411,3 @@ class EPRewardShaper:
 
         print(f"  V(s) computed: mean={v_vals.mean():.4f}, std={v_vals.std():.4f}")
         return v_vals
-
-
-def shape_rewards_ep(reader, cfg=None):
-    """Convenience function for hooks.py integration.
-
-    Reads configuration from cfg.env.reward_shaping, falling back to environment variables:
-        EP_SHAPE_CKPT_DIR: EP checkpoint directory (default: results/checkpoints/early_prediction)
-        EP_SHAPE_LAMBDA: Shaping coefficient (default: 1.0)
-        EP_SHAPE_GAMMA: Discount factor (default: 0.99)
-        EP_SHAPE_WINDOW: Window hours (default: 12)
-        EP_SHAPE_ARCH: EP architecture filter (default: None = use all)
-        EP_SHAPE_CQL_CKPT: CQL checkpoint dir for V(s) (default: results/checkpoints/mimic)
-    """
-    rs_cfg = cfg.env.get("reward_shaping", {}) if cfg and hasattr(cfg, "env") else {}
-
-    ep_ckpt_dir = rs_cfg.get("ep_ckpt_dir") or os.environ.get(
-        "EP_SHAPE_CKPT_DIR", "results/checkpoints/early_prediction"
-    )
-    lambda_coef = float(rs_cfg.get("lambda_coef", os.environ.get("EP_SHAPE_LAMBDA", "1.0")))
-    gamma = float(rs_cfg.get("gamma", os.environ.get("EP_SHAPE_GAMMA", "0.99")))
-    window_hours = int(rs_cfg.get("window_hours", os.environ.get("EP_SHAPE_WINDOW", "12")))
-    ep_arch = rs_cfg.get("ep_arch") or os.environ.get("EP_SHAPE_ARCH", None)
-
-    shaper = EPRewardShaper(
-        ep_ckpt_dir=ep_ckpt_dir,
-        lambda_coef=lambda_coef,
-        gamma=gamma,
-        window_hours=window_hours,
-        ep_architecture=ep_arch,
-    )
-
-    shaper.shape_rewards(reader, cfg)
