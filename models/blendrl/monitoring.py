@@ -5,9 +5,9 @@ The caller controls sampling and logging; all tensors are detached before use.
 from __future__ import annotations
 
 import math
-import re
 
 import torch
+from .monitor_catalog import expert_names
 
 
 def routing_metrics(weights: torch.Tensor, module_types: list[str], *, threshold: float = 0.9,
@@ -30,7 +30,7 @@ def routing_metrics(weights: torch.Tensor, module_types: list[str], *, threshold
                'blend/entropy_normalized': (entropy.mean() / math.log(n)).item() if n > 1 else 0.0,
                'blend/mixed_share': (w.max(-1).values < threshold).float().mean().item()}
     winners = w.argmax(-1)
-    names = [f'{re.sub(r"[^a-z0-9_]+", "_", str(t).lower()).strip("_") or "module"}_{i}' for i, t in enumerate(module_types)]
+    names = expert_names(module_types)
     for i, name in enumerate(names):
         values = w[:, i]
         prefix = f'blend/{name}'

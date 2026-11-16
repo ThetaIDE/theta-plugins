@@ -2,7 +2,7 @@
   "id": "blendrl",
   "name": "BlendRL Neural-Symbolic Policy",
   "kind": "model",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "Modular actor-critic architecture combining neural networks and symbolic reasoners with adaptive blending.",
   "author": {
     "name": "NeSyRL Contributors",
@@ -25,19 +25,25 @@
       "neumann"
     ],
     "pip": [
-      "captum"
+      "captum",
+      "lark"
     ]
   },
   "config_path": "model/blendrl.yaml",
   "config_paths": [
     "model/blendrl.yaml",
-    "plot/blendrl/blend_routing.yaml"
+    "plot/blendrl/blend_routing.yaml",
+    "data/blendrl/symbolic_state.yaml",
+    "data/blendrl/cartpole_state.yaml"
   ],
   "compatibility": {
     "theta": ">=2.0.0"
   },
   "parameter_schema": {
     "type": "object",
+    "required": [
+      "blender_model"
+    ],
     "properties": {
       "actor_mode": {
         "type": "string",
@@ -111,18 +117,13 @@
         "description": "Maximum recent observations to save for routing plots; 0 disables."
       },
       "logic_confidence_floor": {
-        "type": [
-          "number",
-          "null"
-        ],
+        "type": "number",
         "minimum": 0,
         "exclusiveMaximum": 1,
-        "description": "Truth scores at or below this floor abstain; stronger evidence blends with the default action distribution. Null preserves legacy normalization for historical checkpoints."
+        "description": "Truth scores at or below this floor abstain; stronger evidence blends with the default action distribution."
       },
       "blender_model": {
         "type": "object",
-        "x-theta-domain": "model",
-        "description": "Model used to produce blender weights.",
         "required": [
           "name"
         ],
@@ -131,7 +132,18 @@
             "type": "string",
             "minLength": 1
           }
-        }
+        },
+        "x-theta-domain": "model",
+        "description": "Model used to produce blender weights."
+      },
+      "symbolic_state": {
+        "type": [
+          "string",
+          "object"
+        ],
+        "x-theta-domain": "datamodule",
+        "x-theta-contract": "symbolic_state/v1",
+        "description": "Builder that turns observations into [batch, objects, features] symbolic states for the logic actor and symbolic blender."
       }
     },
     "x-theta-config-schemas": {
@@ -167,11 +179,66 @@
             "type": "boolean"
           }
         }
+      },
+      "data/blendrl/symbolic_state.yaml": {
+        "type": "object",
+        "properties": {
+          "object_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "default": 1
+          },
+          "feature_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "default": null
+          },
+          "builder": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          }
+        },
+        "additionalProperties": false
+      },
+      "data/blendrl/cartpole_state.yaml": {
+        "type": "object",
+        "properties": {
+          "object_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "default": 1
+          },
+          "feature_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "default": null
+          },
+          "builder": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          }
+        },
+        "additionalProperties": false
       }
-    },
-    "required": [
-      "blender_model"
-    ]
+    }
   },
   "storage_version": 3,
   "api_version": 1,
@@ -180,8 +247,44 @@
       "id": "blendrl",
       "kind": "model",
       "entry_point": "agents/blender_agent.py:BlenderActorCritic",
-      "aliases": [
-        "blender"
+      "aliases": [],
+      "monitoring": {
+        "provides": [],
+        "catalog": "monitor_catalog.py:describe"
+      },
+      "monitor_defaults": {
+        "blend_reliance": {
+          "component": "blendrl/reliance",
+          "enabled": false
+        }
+      },
+      "monitoring_access": [
+        "blendrl.expert_interventions.v1"
+      ],
+      "requires": [
+        {
+          "level": "block",
+          "config": "model.symbolic_state",
+          "present": true,
+          "when": {
+            "model.actor_mode": [
+              "hybrid",
+              "logic"
+            ]
+          },
+          "message": "BlendRL's hybrid and logic actors need a symbolic state builder: select model.symbolic_state."
+        },
+        {
+          "level": "block",
+          "config": "model.symbolic_state",
+          "present": true,
+          "when": {
+            "model.blender": [
+              "symbolic"
+            ]
+          },
+          "message": "BlendRL's symbolic blender needs a symbolic state builder: select model.symbolic_state."
+        }
       ]
     },
     {
@@ -189,6 +292,82 @@
       "kind": "plotter",
       "entry_point": "plot/blendrl/routing.py:BlendRoutingPlotter",
       "aliases": []
+    },
+    {
+      "id": "blendrl/reliance",
+      "kind": "monitor",
+      "entry_point": "reliance_monitor.py:BlendReliance",
+      "monitoring": {
+        "catalog": "reliance_catalog.py:describe"
+      },
+      "parameter_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reference_action": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "hooks": [
+        "probe_forward.v1",
+        "post_update.v1",
+        "module_interventions.v1",
+        "blendrl.expert_interventions.v1",
+        "policy_probabilities.v1"
+      ]
+    },
+    {
+      "id": "blendrl_symbolic_state",
+      "kind": "datamodule",
+      "entry_point": "symbolic_state.py:SymbolicStateLoader",
+      "parameter_schema": {
+        "type": "object",
+        "properties": {
+          "object_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "default": 1
+          },
+          "feature_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "default": null
+          },
+          "builder": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          }
+        },
+        "additionalProperties": false
+      },
+      "provides": [
+        "symbolic_state/v1"
+      ],
+      "requires": [
+        {
+          "level": "block",
+          "config": "paradigm",
+          "in": [
+            "online_rl",
+            "offline_rl"
+          ]
+        }
+      ]
     }
   ],
   "payload": {
@@ -198,12 +377,18 @@
       "agents/blender_agent.py",
       "agents/__init__.py",
       "plot/blendrl/__init__.py",
-      "plot/blendrl/routing.py"
+      "plot/blendrl/routing.py",
+      "monitor_catalog.py",
+      "reliance_monitor.py",
+      "reliance_catalog.py",
+      "symbolic_state.py"
     ],
     "resources": [],
     "configs": {
       "model/blendrl.yaml": "configs/model/blendrl.yaml",
-      "plot/blendrl/blend_routing.yaml": "configs/plot/blendrl/blend_routing.yaml"
+      "plot/blendrl/blend_routing.yaml": "configs/plot/blendrl/blend_routing.yaml",
+      "data/blendrl/symbolic_state.yaml": "configs/data/blendrl/symbolic_state.yaml",
+      "data/blendrl/cartpole_state.yaml": "configs/data/blendrl/cartpole_state.yaml"
     }
   }
 }

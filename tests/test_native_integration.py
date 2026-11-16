@@ -115,12 +115,14 @@ for name in ('online_rl','offline_rl','supervised','unsupervised'):
 
 def test_environment_rules_helpers_and_models_use_package_resources(native):
     import torch
-    from src.app.services.rulesets import resolve_ruleset, available_rulesets
     from src.app.core.env_vectorized import VectorizedBaseEnv
     from src.app.core.model_registry import build_model
-    rules=resolve_ruleset(native.paths.root,'cartpole','anticipatory_v1')
+    from src.app.core.workspace_resources import entries
+    resolve_ruleset=provider_export('nsfr','resolve_ruleset',paths=native.paths)
+    rules=resolve_ruleset('cartpole','anticipatory_v1')
     assert rules.directory.is_relative_to(native.paths.installed_components/'nsfr/resources/rules')
-    assert len([r for r in available_rulesets(native.paths.root,'cartpole') if r.name=='anticipatory_v1'])==1
+    assert rules.directory==resolve_ruleset(None,'cartpole/anticipatory_v1').directory
+    assert 'cartpole/anticipatory_v1' in entries('rules',native.paths)
     env=VectorizedBaseEnv.from_name('gym_classic_control/cartpole',n_envs=2,seed=3)
     try:
         obs=env.reset();assert obs.shape==(2,4)
@@ -191,7 +193,7 @@ def test_real_sb3_worker_training_and_fresh_checkpoint(native, model):
     overrides=['paradigm=online_rl','agent=sb3/ppo','++agent.name=sb3_agent','env=gym_classic_control/cartpole',
                'model='+model,'total_timesteps=64','agent.n_steps=32','agent.batch_size=32','agent.n_epochs=1',
                'env.num_envs=1','group=native','experiment_id='+experiment]
-    if model=='blendrl':overrides+=['model.symbolic.rules=anticipatory_v1']
+    if model=='blendrl':overrides+=['model.symbolic.rules=anticipatory_v1','++model.symbolic_state=blendrl/cartpole_state']
     result=execute(native,['-m','src.app.pipeline.provider_worker','src/app/train.py',*overrides])
     assert '[SB3 Engine Complete]' in result.stdout
     run=native.paths.results/'checkpoints/native'/experiment/'sb3_agent'
@@ -397,7 +399,6 @@ def test_native_blendrl_editable_copy_owns_its_auxiliary_plot(native):
     plot=native.paths.config_resolver().resolve('plot/native_blendrl_copy/blend_routing.yaml')
     assert plot is not None and plot.package.id=='native_blendrl_copy'
     assert resolve_provider('model','native_blendrl_copy',native.paths) is not resolve_provider('model','blendrl',native.paths)
-    assert resolve_provider('model','blender',native.paths) is resolve_provider('model','blendrl',native.paths)
     assert resolve_provider('plotter','native_blendrl_copy/blend_routing',native.paths) is not None
     assert content_hash(original.root)==before
     local=LocalComponents(native.paths)
@@ -508,11 +509,11 @@ def test_native_sb3_replicates_record_episodes(native,monkeypatch):
 
 # BlendRL and the basic models inside the sb3-suite policy adapters (moved from the IDE suite,
 # which no longer depends on installed research packages).
-BLEND_CFG = {'architecture': 'blendrl', 'actor_mode': 'hybrid', 'blend_function': 'softmax',
+BLEND_CFG = {'architecture': 'blendrl', 'actor_mode': 'hybrid', 'blend_function': 'softmax', 'logic_confidence_floor': .05,
              'blender': 'neural', 'blender_model': {'name': 'basics/dnn', 'hidden_sizes': [16, 16]},
              'neural': {'type': 'dnn', 'hidden_sizes': [32, 32]},
-             'symbolic': {'type': 'nsfr', 'rules': 'variant2',
-                          'observation_builder': 'export://gym_classic_control/cartpole_symbolic_observation'}}
+             'symbolic': {'type': 'nsfr', 'rules': 'variant2'},
+             'symbolic_state': 'blendrl/cartpole_state'}
 CARTPOLE = {'env_name': 'cartpole', 'action_meanings': ['left', 'right']}
 
 
@@ -533,21 +534,24 @@ def bare_blender(native):
     return model
 
 
-def test_blendrl_uses_its_configured_symbolic_observation_builder(native):
+def test_blendrl_builds_symbolic_states_with_its_selected_builder(native):
     import torch
     model = bare_blender(native)
-    obs = torch.tensor([[1.0, 2.0, 3.0]])
-    model.cfg = {'model': {'symbolic': {'observation_builder': lambda x: x.unsqueeze(1) * 7}}}
-    torch.testing.assert_close(model.build_logic_observation(obs), obs.unsqueeze(1) * 7)
+    model.actor_mode, model.blender_mode = 'hybrid', 'neural'
+    obs = torch.tensor([[1.0, 2.0, 3.0, 4.0]])
+    model.cfg = {'model': {'symbolic_state': 'blendrl/cartpole_state'}}
+    torch.testing.assert_close(model.build_logic_observation(obs), obs.unsqueeze(1).expand(-1, 2, -1))
 
     class Actor(torch.nn.Module):
         def get_q_values(self, neural_state, logic_state):
             return logic_state[:, 0]
 
     model.actor = Actor()
-    torch.testing.assert_close(model.get_q_values(obs), obs * 7)
-    model.cfg = {'model': {}, 'env': {}}
-    with pytest.raises(ValueError, match='symbolic observation builder'):
+    torch.testing.assert_close(model.get_q_values(obs), obs)
+    model = bare_blender(native)
+    model.actor_mode, model.blender_mode = 'hybrid', 'neural'
+    model.cfg = {'model': {}}
+    with pytest.raises(ValueError, match='symbolic state builder'):
         model.build_logic_observation(obs)
 
 
@@ -560,15 +564,15 @@ def test_blendrl_rejects_an_engine_specific_configuration(native):
     model.validate_engine_compatibility('another_engine', 'on_policy')
 
 
-def test_blendrl_optimizer_rates_allow_null_model_defaults_and_agent_fallback(native):
+def test_blendrl_null_optimizer_rates_use_the_agent_learning_rate(native):
     import torch
     model = bare_blender(native)
-    model.cfg = {'model': {'logic_lr': None, 'blender_lr': .003}, 'agent': {'logic_lr': .002}}
+    model.cfg = {'model': {'logic_lr': None, 'blender_lr': .003}, 'agent': {'logic_lr': .002}}  # agent keys are not read
     model.module_types = ['logic', 'neural']
     model.actor = torch.nn.Module()
     model.actor.policy_modules = torch.nn.ModuleList([torch.nn.Linear(2, 2), torch.nn.Linear(2, 2)])
     model.actor.blender = torch.nn.Linear(2, 2)
-    assert [g['lr'] for g in model.configure_optimizer_groups(.001)] == pytest.approx([.002, .001, .003])
+    assert [g['lr'] for g in model.configure_optimizer_groups(.001)] == pytest.approx([.001, .001, .003])
 
 
 @pytest.mark.parametrize('actor_mode', ['hybrid', 'logic', 'neural'])

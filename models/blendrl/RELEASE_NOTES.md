@@ -1,10 +1,14 @@
-## 1.3.2 (local preparation; unpublished)
+# BlendRL 1.4.0
 
-Declare `blender_model` as a required model selection using the existing form renderer. Its model mapping requires a nonempty `name`. The default explicitly selects the same 64×64 DNN used by the prior implicit neural blender. No special Blender UI or runtime adapter was added.
+Compatibility is declared as capability `requires` rules (Theta SDK 3.1); earlier IDEs reject the manifest.
 
-## 1.3.1 (local preparation; unpublished)
-
-`blender` is the neural/symbolic selector. Configure its model under `blender_model`. Component schemas match the structured neural/symbolic defaults and nullable learning rates.
+- `blender` chooses neural or symbolic routing; its model is the required `blender_model` selection (default: the prior implicit 64×64 DNN).
+- The symbolic state builder is the model parameter `symbolic_state`, a picker of data modules providing `symbolic_state/v1`. Hybrid and logic actors and the symbolic blender block without one. The package provides `blendrl_symbolic_state` with the `data/blendrl/symbolic_state` and `data/blendrl/cartpole_state` profiles; `symbolic.observation_builder` and the environment's `symbolic_observation_builder` are no longer read.
+- Model-owned `blendrl/reliance` monitor (disabled by default): expert and gate counterfactuals for hybrid softmax blending, with a monitor catalog describing BlendRL's metrics.
+- Non-hybrid actor modes zero and renormalize incompatible experts; the symbolic blender receives the logic state in neural-only evaluation.
+- `logic_confidence_floor` is a number; null no longer selects the earlier normalization. Null `logic_lr`/`blender_lr` use the agent's learning rate; matching `agent` keys are no longer read. Comma-separated `rules` strings are no longer split; use a list.
+- The `blender` model alias is removed; select `blendrl`.
+- Rulesets are entries of the `rules` workspace resource NSFR declares. Declares `lark`.
 
 # BlendRL 1.3.0
 
