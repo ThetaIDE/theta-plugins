@@ -1,3 +1,7 @@
+## 1.3.2 (local preparation; unpublished)
+
+Declare `blender_model` as a required model selection using the existing form renderer. Its model mapping requires a nonempty `name`. The default explicitly selects the same 64×64 DNN used by the prior implicit neural blender. No special Blender UI or runtime adapter was added.
+
 ## 1.3.1 (local preparation; unpublished)
 
 `blender` is the neural/symbolic selector. Configure its model under `blender_model`. Component schemas match the structured neural/symbolic defaults and nullable learning rates.

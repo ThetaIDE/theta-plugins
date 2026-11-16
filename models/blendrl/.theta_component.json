@@ -2,7 +2,7 @@
   "id": "blendrl",
   "name": "BlendRL Neural-Symbolic Policy",
   "kind": "model",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "Modular actor-critic architecture combining neural networks and symbolic reasoners with adaptive blending.",
   "author": {
     "name": "NeSyRL Contributors",
@@ -122,7 +122,16 @@
       "blender_model": {
         "type": "object",
         "x-theta-domain": "model",
-        "description": "Model used to produce blender weights."
+        "description": "Model used to produce blender weights.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
     },
     "x-theta-config-schemas": {
@@ -159,7 +168,10 @@
           }
         }
       }
-    }
+    },
+    "required": [
+      "blender_model"
+    ]
   },
   "storage_version": 3,
   "api_version": 1,

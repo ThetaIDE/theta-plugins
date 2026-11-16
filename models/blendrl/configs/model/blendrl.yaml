@@ -2,7 +2,9 @@ name: blendrl
 # BlendRL framework — composes symbolic and neural policy modules
 actor_mode: hybrid
 blender: neural
-blender_model: {}
+blender_model:
+  name: basics/dnn
+  hidden_sizes: [64, 64]
 blend_function: softmax
 blend_q_values: true
 logic_confidence_floor: 0.05
