@@ -1,9 +1,8 @@
 name: blendrl
 # BlendRL framework — composes symbolic and neural policy modules
 actor_mode: hybrid
-blender:
-  mode: neural
-  model: {}
+blender: neural
+blender_model: {}
 blend_function: softmax
 blend_q_values: true
 logic_confidence_floor: 0.05

@@ -512,7 +512,7 @@ def test_native_sb3_replicates_record_episodes(native,monkeypatch):
 # BlendRL and the basic models inside the sb3-suite policy adapters (moved from the IDE suite,
 # which no longer depends on installed research packages).
 BLEND_CFG = {'architecture': 'blendrl', 'actor_mode': 'hybrid', 'blend_function': 'softmax',
-             'blender': {'mode': 'neural', 'model': {'name': 'basics/dnn', 'hidden_sizes': [16, 16]}},
+             'blender': 'neural', 'blender_model': {'name': 'basics/dnn', 'hidden_sizes': [16, 16]},
              'neural': {'type': 'dnn', 'hidden_sizes': [32, 32]},
              'symbolic': {'type': 'nsfr', 'rules': 'variant2',
                           'observation_builder': 'export://gym_classic_control/cartpole_symbolic_observation'}}

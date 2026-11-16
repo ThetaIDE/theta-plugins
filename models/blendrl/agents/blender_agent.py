@@ -638,21 +638,13 @@ class BlenderActorCritic(nn.Module):
         modules_list = modules if modules is not None else self.get_cfg("modules", None)
         symbolic_cfg = self.get_cfg("symbolic", None) or self.get_cfg("symbolic_actor", None)
         neural_cfg = self.get_cfg("neural", None) or self.get_cfg("neural_actor", None)
-        blender_cfg = self.get_cfg("blender", None) or self.get_cfg("blender_actor", None)
-
-        if blender_cfg is not None:
-            self.blender_mode = _get_val(blender_cfg, "mode", self.blender_mode)
-            if self.blender_mode == "symbolic":
-                self.blender_mode = "logic"
-            self.blender_model = _get_val(blender_cfg, "model", None) or None
-            self.blend_function = self.get_cfg(
-                "blend_function", _get_val(blender_cfg, "blend_function", self.blend_function)
-            )
-            blender_reasoner = _get_val(blender_cfg, "reasoner", self.reasoner or "nsfr")
-        else:
-            self.blender_model = None
-            self.blend_function = self.get_cfg("blend_function", self.blend_function)
-            blender_reasoner = self.reasoner or "nsfr"
+        blender = self.get_cfg("blender", blender_mode)
+        if not isinstance(blender, str) or blender not in ("neural", "symbolic"):
+            raise ValueError("blender must be neural or symbolic")
+        self.blender_mode = "logic" if blender == "symbolic" else blender
+        self.blender_model = self.get_cfg("blender_model", None) or None
+        self.blend_function = self.get_cfg("blend_function", self.blend_function)
+        blender_reasoner = self.reasoner or "nsfr"
 
         if modules_list is None and (symbolic_cfg is not None or neural_cfg is not None):
             modules_list = []
