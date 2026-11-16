@@ -1,7 +1,6 @@
 import os
 
-from src.app.api.rulesets import resolve_ruleset
-from src.app.api.workspace import WorkspacePaths
+from .rulesets import resolve_ruleset
 
 from .facts_converter import FactsConverter
 from .nsfr import NSFReasoner
@@ -12,7 +11,7 @@ from .valuation import ValuationModule
 def get_nsfr_model(env_name: str, rules: str, device: str, train=False, explain=False):
     current_path = os.path.dirname(__file__)
     lark_path = os.path.join(current_path, 'lark/exp.lark')
-    resource = resolve_ruleset(WorkspacePaths.for_process().root, env_name, rules)
+    resource = resolve_ruleset(env_name, rules)
     lang_base_path = str(resource.directory.parent) + "/"
 
     lang, clauses, bk, atoms = get_lang(lark_path, lang_base_path, resource.name)
@@ -36,7 +35,7 @@ def get_nsfr_model(env_name: str, rules: str, device: str, train=False, explain=
 def get_blender_nsfr_model(env_name: str, rules: str, device: str, train=False, mode='normal', explain=False):
     current_path = os.path.dirname(__file__)
     lark_path = os.path.join(current_path, 'lark/exp.lark')
-    resource = resolve_ruleset(WorkspacePaths.for_process().root, env_name, rules)
+    resource = resolve_ruleset(env_name, rules)
     lang_base_path = str(resource.directory.parent) + "/"
 
     lang, clauses, bk, atoms = get_blender_lang(lark_path, lang_base_path, resource.name)

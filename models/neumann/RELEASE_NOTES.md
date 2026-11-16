@@ -1,5 +1,7 @@
 # 1.1.1
 
+Compatibility is declared once, as capability `requires` rules in the manifest. The package-level `paradigms` list, profile `compatible_paradigms`, `execution_features.input_types` and class-level `get_supported_paradigms` are gone; nothing reads them. Requires an IDE with Theta SDK 3.1 (the compatibility-requirements release); earlier IDEs reject the manifest. Resolves rulesets through NSFR's `resolve_ruleset` export; the `rules` parameter is a picker of the `rules` resource NSFR declares.
+
 Removes `neumann_utils.py`, `valuation.py` and `valuation_func.py`, an unused perception chain that imported modules the package does not provide. Valuation functions still come from the selected rules. Selectors and defaults are unchanged.
 
 # 1.1.0

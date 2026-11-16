@@ -1,7 +1,5 @@
 import os
 
-from src.app.api.rulesets import resolve_ruleset
-from src.app.api.workspace import WorkspacePaths
 
 from .message_passing import MessagePassingModule
 from .neumann import NEUMANN
@@ -15,12 +13,13 @@ get_blender_lang = provider_export('nsfr', 'get_blender_lang')
 get_lang = provider_export('nsfr', 'get_lang')
 from src.app.api.packages import provider_export
 ValuationModule = provider_export('nsfr', 'ValuationModule')
+resolve_ruleset = provider_export('nsfr', 'resolve_ruleset')
 
 
 def get_neumann_model(env_name: str, rules: str, device: str, train=True, explain=False):
     current_path = os.path.dirname(__file__)
     lark_path = os.path.join(current_path, 'lark/exp.lark')
-    resource = resolve_ruleset(WorkspacePaths.for_process().root, env_name, rules)
+    resource = resolve_ruleset(env_name, rules)
     lang_base_path = str(resource.directory.parent) + "/"
 
     lang, clauses, bk, atoms = get_lang(lark_path, lang_base_path, resource.name)
@@ -48,7 +47,7 @@ def get_neumann_model(env_name: str, rules: str, device: str, train=True, explai
 def get_blender_neumann_model(env_name: str, rules: str, device: str, train=False, mode='normal', explain=False):
     current_path = os.path.dirname(__file__)
     lark_path = os.path.join(current_path, 'lark/exp.lark')
-    resource = resolve_ruleset(WorkspacePaths.for_process().root, env_name, rules)
+    resource = resolve_ruleset(env_name, rules)
     lang_base_path = str(resource.directory.parent) + "/"
 
     lang, clauses, bk, atoms = get_blender_lang(lark_path, lang_base_path, resource.name)

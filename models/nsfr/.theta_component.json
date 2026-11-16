@@ -2,7 +2,7 @@
   "id": "nsfr",
   "name": "Neural Symbolic Forward Reasoner (NSFR)",
   "kind": "model",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Differentiable forward reasoning engine computing soft valuations over first-order logic clauses.",
   "author": {
     "name": "Hikaru Shindo"
@@ -19,18 +19,14 @@
     "properties": {
       "rules": {
         "type": "string",
-        "x-theta-domain": "ruleset",
+        "x-theta-resource": "rules",
         "x-theta-actions": [
           {
             "type": "open-in-editor",
-            "label": "Open rules folder",
-            "handler": {
-              "path": "package://nsfr/editor_actions.py",
-              "function": "rules_edit_targets"
-            }
+            "label": "Open rules folder"
           }
         ],
-        "description": "Environment-scoped ruleset name, or environment/name in an unscoped model profile."
+        "description": "Ruleset entry environment/name, or a bare name resolved against the experiment environment's symbolic name."
       },
       "logic_type": {
         "type": "string"
@@ -44,7 +40,6 @@
       "tqdm"
     ]
   },
-  "rules_root": "resources/rules",
   "storage_version": 3,
   "api_version": 1,
   "capabilities": [
@@ -60,7 +55,6 @@
       "nsfr.py",
       "nsfr_beam.py",
       "mode_declaration.py",
-      "editor_actions.py",
       "__init__.py",
       "refinement.py",
       "facts_converter.py",
@@ -82,7 +76,8 @@
       "utils/common.py",
       "utils/valuation.py",
       "utils/beam.py",
-      "utils/torch.py"
+      "utils/torch.py",
+      "rulesets.py"
     ],
     "resources": [
       "resources",
@@ -103,7 +98,14 @@
     "get_lang": "utils/logic.py:get_lang",
     "get_nsfr_model": "common.py:get_nsfr_model",
     "load_module": "utils/common.py:load_module",
+    "resolve_ruleset": "rulesets.py:resolve_ruleset",
     "subs_list": "fol/logic_ops.py:subs_list",
     "unify": "fol/logic_ops.py:unify"
+  },
+  "workspace_resources": {
+    "rules": {
+      "path": "resources/rules",
+      "depth": 2
+    }
   }
 }

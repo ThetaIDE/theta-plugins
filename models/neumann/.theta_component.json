@@ -19,18 +19,14 @@
     "properties": {
       "rules": {
         "type": "string",
-        "x-theta-domain": "ruleset",
+        "x-theta-resource": "rules",
         "x-theta-actions": [
           {
             "type": "open-in-editor",
-            "label": "Open rules folder",
-            "handler": {
-              "path": "package://neumann/editor_actions.py",
-              "function": "rules_edit_targets"
-            }
+            "label": "Open rules folder"
           }
         ],
-        "description": "Environment-scoped ruleset name, or environment/name in an unscoped model profile."
+        "description": "Ruleset entry environment/name, or a bare name resolved against the experiment environment's symbolic name."
       },
       "logic_type": {
         "type": "string"
@@ -63,7 +59,6 @@
       "reasoning_graph.py",
       "neumann.py",
       "soft_logic.py",
-      "editor_actions.py",
       "__init__.py",
       "refinement.py",
       "facts_converter.py",

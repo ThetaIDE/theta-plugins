@@ -11,10 +11,6 @@
   "compatibility": {
     "theta": ">=2.0.0"
   },
-  "paradigms": [
-    "supervised",
-    "offline_rl"
-  ],
   "dependencies": {
     "components": [
       "thetalib",
@@ -90,5 +86,10 @@
     "workflow/sepsis_reciprocal.yaml"
   ],
   "config_path": "experiment/mimic/_base.yaml",
-  "rules_root": "resources/rules"
+  "workspace_resources": {
+    "rules": {
+      "path": "resources/rules",
+      "depth": 2
+    }
+  }
 }
