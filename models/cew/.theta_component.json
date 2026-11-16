@@ -2,7 +2,7 @@
   "id": "cew",
   "name": "Clinical Expert Weighting (CEW)",
   "kind": "model",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "installed_from": "https://raw.githubusercontent.com/CameronEgb/theta-hub/main/packages/cew-1.0.0.zip",
   "sha256": "3db5d37219a88e614ff52a8a6cbd5bcee4fa956462311f5325ca6d4e43397043",
   "config_path": "model/cew.yaml",
@@ -25,7 +25,9 @@
   ],
   "dependencies": {
     "components": [],
-    "pip": []
+    "pip": [
+      "igraph>=0.10"
+    ]
   },
   "storage_version": 3,
   "api_version": 1,

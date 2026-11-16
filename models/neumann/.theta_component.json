@@ -2,7 +2,7 @@
   "id": "neumann",
   "name": "NEUMANN Neural Symbolic Reasoner",
   "kind": "model",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Neuro-symbolic message passing reasoner over logic graphs.",
   "author": {
     "name": "Hikaru Shindo"
@@ -66,13 +66,10 @@
       "editor_actions.py",
       "__init__.py",
       "refinement.py",
-      "neumann_utils.py",
       "facts_converter.py",
       "common.py",
-      "valuation.py",
       "message_passing.py",
       "scatter.py",
-      "valuation_func.py",
       "torch_utils.py",
       "fol/__init__.py",
       "fol/logic.py",

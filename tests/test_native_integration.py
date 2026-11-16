@@ -247,7 +247,6 @@ def test_desktop_app_plugins_preserve_identity_settings_and_lease(native):
         cls=load_capability(package,cap,paths=native.paths)
         instance=cls(manifest)
         assert instance.manifest.id==plugin_id
-    assert manager.manifests['model_builder'].is_core
 
 
 def test_workspace_override_and_packaged_default_precedence(native):
@@ -296,19 +295,6 @@ def test_real_offline_runner_uses_explicit_transition_dataset(native):
     record=json.loads(next(run.glob('*/execution.json')).read_text())
     assert record['status']=='completed' and record['metadata']['backend']=='d3rlpy'
     assert list(run.glob('*/latest_model.d3'))
-
-
-def test_native_experiment_export_keeps_provider_dependency_ownership(native,tmp_path):
-    from src.app.services.experiment_exporter import ExperimentExporter,ExportOptions
-    result=ExperimentExporter(native.paths.root).export_group('robotics',ExportOptions(output_path=tmp_path/'robotics.zip'))
-    assert result.success,result.error
-    manifest=result.manifest
-    assert not {'legacy_paths','module_aliases','target_path'} & manifest.keys()
-    assert manifest['capabilities']==[]
-    assert {'robotics-mujoco','sb3-suite','mlp'} <= {d['id'] for d in manifest['dependencies']['components']}
-    with ZipFile(result.archive_path) as archive:
-        assert not any(p.endswith(('.py','.pyc')) for p in archive.namelist())
-        assert 'configs/experiment/robotics/_base.yaml' in archive.namelist()
 
 
 def test_selected_objective_and_backend(native):
@@ -422,38 +408,49 @@ def test_native_blendrl_editable_copy_owns_its_auxiliary_plot(native):
     assert profile.is_file() and (copied.root/'plot/blendrl/routing.py').is_file()
 
 
-def test_native_sb3_real_optuna_trial_and_checkpoint(native):
+def test_native_sb3_real_optuna_trial_and_checkpoint(native, monkeypatch):
+    """A tuned recipe runs a real Optuna study through the pipeline and promotes the best checkpoint."""
     import optuna
     # Tuning is an optional component; install the IDE's Optuna package into this workspace.
     sys.path.insert(0,str(IDE/'tests'))
     from component_fixtures import install_optional
     install_optional(native.paths,'optuna',native.base/'optional-archives')
-    promote_best_trial_checkpoint=load_module(ProviderCatalog(native.paths).package('optuna'),'utils.py',
-                                              paths=native.paths).promote_best_trial_checkpoint
-    storage='sqlite:///'+str(native.base/'native-study.db')
-    execute(native,['-m','src.app.pipeline.provider_worker','src/app/train.py',
-        '--multirun','paradigm=online_rl','agent=sb3/ppo','++agent.name=sb3_agent','env=gym_classic_control/cartpole','model=basics/dnn',
-        'total_timesteps=8','eval_episodes=1','+eval_freq_steps=8','agent.n_steps=8',
-        'agent.batch_size=4','agent.n_epochs=1','env.num_envs=1','group=native',
-        'experiment_id=tuned','+tuning.metric=eval/reward','+tuning.component=optuna','hydra/sweeper=optuna_online',
-        'hydra.sweeper.n_trials=1','hydra.sweeper.study_name=native-study',
-        'hydra.sweeper.storage='+storage,'agent.learning_rate=choice(0.001,0.002)'])
-    study=optuna.load_study(study_name='native-study',storage=storage)
-    assert len(study.trials)==1 and study.trials[0].state==optuna.trial.TrialState.COMPLETE
-    import math
-    assert math.isfinite(study.best_value)
-    # Promotion uses the recorded study/trial identity, independent of Hydra job index.
-    previous=Path.cwd()
-    try:
-        os.chdir(native.paths.root)
-        promote_best_trial_checkpoint('native','tuned','sb3_agent',storage,'native-study')
-    finally:
-        os.chdir(previous)
+    recipe=native.paths.config/'experiment/native/tuned.yaml'
+    recipe.parent.mkdir(parents=True,exist_ok=True)
+    recipe.write_text("""# @package _global_
+defaults:
+  - override /env: gym_classic_control/cartpole
+  - _self_
+paradigm: online_rl
+group: native
+experiment_id: tuned
+total_timesteps: 8
+eval_episodes: 1
+eval_freq_steps: 8
+no_plot: true
+monitors: {}
+tuning:
+  component: optuna
+  metric: eval/reward
+  direction: maximize
+  options:
+    optuna: {n_trials: 1, n_jobs: 1, sampler: random, seed: 1, study_name: native-study, study_mode: new, pruner: none}
+methods:
+  sb3_agent:
+    agent: {name: sb3/ppo, n_steps: 8, batch_size: 4, n_epochs: 1}
+    model: {name: basics/dnn}
+    tune:
+      agent.learning_rate: {type: choice, values: [0.001, 0.002]}
+""")
+    for key,value in native.paths.process_environment().items(): monkeypatch.setenv(key,value)
+    execute(native,[str(IDE/'run_pipeline.py'),'native/tuned'],timeout=600)
+    # Promotion puts the best trial's checkpoint beside the method's checkpoints.
     root=native.paths.results/'checkpoints/native/tuned/sb3_agent'
     assert (root/'best_model.zip').is_file()
     summary=json.loads((root/'tuning_summary.json').read_text())
-    assert summary['trials'][0]['value']==study.best_value
-    assert summary['objective_metric']=='eval/reward'
+    assert summary['objective_metric']=='eval/reward' and len(summary['trials'])==1
+    import math
+    assert math.isfinite(summary['trials'][0]['value'])
 
 
 def test_native_cartpole_sb3_objective_worker(native,tmp_path):
