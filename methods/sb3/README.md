@@ -42,3 +42,20 @@ rejected; native inference reload is supported.
 
 Mechanistic monitors attach at SB3's post-update boundary through
 `sb3_monitoring.py`, which this package owns.
+
+## Model protocols for PPO
+
+Theta models drive PPO and A2C through `theta_sb3_policy.py`. PPO additionally
+serves three opt-in protocols, which a model lists in its `sb3_protocols`
+attribute:
+
+| Protocol | The model implements | PPO |
+| --- | --- | --- |
+| `rollout_context.v1` | `get_action_and_value(obs, action=None, *, phase, context=None)` | samples with `phase="rollout"` and stores any `aux["rollout_context"]` (`[batch, width]`) with the transition; re-evaluates it with `phase="update"` and that context; values next states with `phase="bootstrap"` |
+| `training_progress.v1` | `on_rollout_start(num_timesteps, total_timesteps)`, `on_env_step(dones, infos)`, optionally `training_metrics()` | calls them before each rollout and after each environment step; at each rollout end records every `training_metrics()` entry as `diagnostics/<name>` |
+| `auxiliary_losses.v1` | `compute_auxiliary_losses(batch, output)` | adds the returned scalar terms, already weighted and signed, to each minibatch loss and logs `losses/train/aux_loss/<name>`; `batch` holds observations, actions, old values and log-probabilities, raw advantages, returns and contexts |
+
+Without them, PPO uses SB3's own update. With them, `ThetaPPO.train` follows
+the SB3 2.9 PPO update exactly and adds only these terms, so the package pins
+`stable-baselines3>=2.9,<2.10`. Evaluation never passes a phase: it calls
+`get_action_probs`. A2C rejects a model that declares any protocol.

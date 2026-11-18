@@ -1,3 +1,13 @@
+# 2.2.0
+
+PPO serves three opt-in model protocols, which a model lists in `sb3_protocols`:
+
+- `rollout_context.v1`: the model may return `aux["rollout_context"]` while sampling (`phase="rollout"`). PPO stores it with each transition and passes it back when it re-evaluates that transition (`phase="update"`); next-state values use `phase="bootstrap"`.
+- `training_progress.v1`: PPO calls `on_rollout_start(num_timesteps, total_timesteps)` before each rollout and `on_env_step(dones, infos)` after each environment step. An optional `training_metrics()` is read at each rollout end and logged as `diagnostics/<name>`.
+- `auxiliary_losses.v1`: PPO adds the model's `compute_auxiliary_losses(batch, output)` terms (already weighted and signed) to each minibatch loss and logs them as `losses/train/aux_loss/<name>`.
+
+A model that declares none of them trains with SB3's own PPO update. A model that declares any trains only with `sb3/ppo`; A2C rejects it. Requires stable-baselines3 2.9, whose PPO update this release follows.
+
 # 2.1.0
 
 Compatibility is declared once, as capability `requires` rules in the manifest. The package-level `paradigms` list, profile `compatible_paradigms`, `execution_features.input_types` and class-level `get_supported_paradigms` are gone; nothing reads them. Requires an IDE with Theta SDK 3.1 (the compatibility-requirements release); earlier IDEs reject the manifest. Algorithms block a configured `data_module` or `dataset_path`: they train from the live environment only.

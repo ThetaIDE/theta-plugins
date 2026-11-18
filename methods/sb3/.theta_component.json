@@ -2,7 +2,7 @@
   "id": "sb3-suite",
   "name": "Stable-Baselines3 Suite",
   "kind": "method",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Standard reinforcement learning algorithms (PPO, DQN, A2C, SAC) powered by Stable-Baselines3.",
   "author": "DLR-RM & SB3 Contributors",
   "tags": [
@@ -16,7 +16,7 @@
   "api_version": 1,
   "dependencies": {
     "pip": [
-      "stable-baselines3",
+      "stable-baselines3>=2.9,<2.10",
       "gymnasium",
       "shimmy"
     ],
