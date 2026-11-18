@@ -1,0 +1,66 @@
+{
+  "id": "slurm",
+  "name": "Slurm scheduler",
+  "kind": "package",
+  "version": "3.0.0",
+  "description": "Run experiments on Slurm clusters: site setup, job submission, resource headers and a scheduler monitor. Sites are authored in the workspace.",
+  "author": {
+    "name": "Theta-IDE Team"
+  },
+  "repository": "https://github.com/ThetaIDE/ThetaIDE",
+  "license": "MIT",
+  "storage_version": 3,
+  "api_version": 1,
+  "dependencies": {
+    "components": [],
+    "pip": [
+      "packaging>=23"
+    ]
+  },
+  "capabilities": [
+    {
+      "id": "slurm",
+      "kind": "scheduler",
+      "entry_point": "execution.py:Scheduler",
+      "scheduler_api": 2,
+      "contribution_api": 1,
+      "readiness": {
+        "config": [
+          "site.connection.host",
+          "site.connection.remote_root"
+        ]
+      },
+      "contributions": [
+        {
+          "id": "setup",
+          "slot": "settings.site",
+          "availability": "enabled",
+          "entry_point": "settings.py:create_settings"
+        },
+        {
+          "id": "launch",
+          "slot": "commands.site",
+          "availability": "ready"
+        },
+        {
+          "id": "scheduler-monitor",
+          "slot": "monitor.scheduler",
+          "availability": "ready"
+        }
+      ]
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "__init__.py",
+      "commands.py",
+      "execution.py",
+      "headers.py",
+      "resources.py",
+      "settings.py",
+      "shell.py"
+    ],
+    "resources": [],
+    "configs": {}
+  }
+}

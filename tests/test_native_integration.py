@@ -412,10 +412,9 @@ def test_native_blendrl_editable_copy_owns_its_auxiliary_plot(native):
 def test_native_sb3_real_optuna_trial_and_checkpoint(native, monkeypatch):
     """A tuned recipe runs a real Optuna study through the pipeline and promotes the best checkpoint."""
     import optuna
-    # Tuning is an optional component; install the IDE's Optuna package into this workspace.
-    sys.path.insert(0,str(IDE/'tests'))
-    from component_fixtures import install_optional
-    install_optional(native.paths,'optuna',native.base/'optional-archives')
+    # Tuning is a component; install Optuna from this checkout into the workspace.
+    from package_fixtures import install_package
+    install_package(native.paths,'optuna',native.base/'optuna-archives')
     recipe=native.paths.config/'experiment/native/tuned.yaml'
     recipe.parent.mkdir(parents=True,exist_ok=True)
     recipe.write_text("""# @package _global_
@@ -660,9 +659,9 @@ def test_blendrl_routing_monitor_reports_experts_and_keeps_gradients_usable(nati
     selected = model.policy.theta_model_module
     metrics, samples = selected.collect_monitoring(torch.tensor([[0., 0., -.1, 0.], [0., 0., .1, 0.]]))
     assert samples['weights'].shape == (2, 2)
-    assert 'blend/logic/weight_mean' in metrics
-    assert 0 <= metrics['blend/logic_0/coverage'] <= 1
-    assert 'blend/agreement/logic_0__neural_1/top_action' in metrics
+    assert 'blend/logic/weight_mean' in metrics and 'blend/neural/weight_mean' in metrics
+    assert 0 <= metrics['blend/logic/coverage'] <= 1
+    assert 'blend/agreement/logic__neural/top_action' in metrics
     assert not selected.actor._capture_experts
     model.learn(total_timesteps=8)
     env.close()
@@ -692,7 +691,7 @@ def test_blendrl_partial_rules_abstain_when_unmatched_and_report_coverage(native
         assert mapped[0, 0] > .99
         torch.testing.assert_close(mapped[1:], torch.full((2, 2), .5))
         metrics, _ = model.collect_monitoring(obs)
-        assert metrics['blend/logic_0/coverage'] == pytest.approx(1 / 3)
+        assert metrics['blend/logic/coverage'] == pytest.approx(1 / 3)
         # Neural expert options must not be silently discarded by the composite.
         assert isinstance(model.policy_modules[1].network[1], torch.nn.Tanh)
         algo.learn(total_timesteps=32)

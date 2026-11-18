@@ -1,8 +1,9 @@
 # Theta Plugins & Components
 
 Maintained research providers, environments, model architectures, data modules,
-evaluators, plots, application extensions, experiment profiles and dependency
-suites for Theta-IDE. The IDE separately ships its generic framework, four base
+evaluators, plots, application extensions, experiment profiles, dependency
+suites, the Optuna tuner (`tuners/optuna`) and the Slurm scheduler (`schedulers/slurm`)
+for Theta-IDE. The IDE separately ships its generic framework, four base
 paradigms and bundled providers.
 
 All 39 maintained packages use native manifests: `storage_version: 3`,
@@ -73,6 +74,9 @@ rewritten by source conversion.
   Lightning training components. SB3/d3rlpy runners resolve workspace/config
   roots themselves; the generic worker supplies package context and leases.
 - SB3 algorithm capabilities declare `episode_outcomes: true` for objective/replicate planning; filenames do not establish that contract.
+- Slurm owns submission, allocation validation, job headers and allocation-side
+  supervision; it ships no site profiles. Clusters are workspace-authored site packages.
+- Optuna owns its Hydra sweeper profile, study storage, pruning and parallel trials.
 - d3rlpy targets its 2.x API and requires an explicit transition dataset. It
   reports unsupported algorithms/APIs rather than falling back to another
   algorithm, synthesizing data, or silently omitting training.

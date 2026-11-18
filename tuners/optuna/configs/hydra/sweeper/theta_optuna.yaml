@@ -1,0 +1,16 @@
+# @package hydra.sweeper
+# Every value is compiled from the experiment's tuning block by the Optuna tuner component.
+_target_: hydra_plugins.theta_sweeper.ThetaSweeper
+tuner: optuna
+sampler: {}
+direction: ???
+storage: ???
+study_name: ???
+n_trials: ???
+n_jobs: ???
+search_space: null
+pruner: ???
+pruner_startup_trials: ???
+pruner_warmup_steps: ???
+timeout_seconds: ???
+max_failed_trials: ???

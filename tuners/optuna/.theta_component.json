@@ -1,0 +1,86 @@
+{
+  "id": "optuna",
+  "name": "Optuna tuner",
+  "kind": "tuner",
+  "version": "1.3.0",
+  "description": "Hyperparameter sweeps with Optuna: metric or objective-component studies, pruning, parallel and remote trials, and a study monitor.",
+  "author": {
+    "name": "Theta-IDE Team"
+  },
+  "repository": "https://github.com/ThetaIDE/ThetaIDE",
+  "license": "MIT",
+  "storage_version": 3,
+  "api_version": 1,
+  "dependencies": {
+    "pip": [
+      "optuna>=3.0,<5",
+      "sqlalchemy>=1.4.2,<3"
+    ],
+    "components": []
+  },
+  "capabilities": [
+    {
+      "id": "optuna",
+      "kind": "tuner",
+      "entry_point": "component.py:OptunaTuner",
+      "contribution_api": 1,
+      "readiness": {
+        "distributions": [
+          "optuna",
+          "sqlalchemy"
+        ]
+      },
+      "contributions": [
+        {
+          "id": "configure",
+          "slot": "configuration.tuning",
+          "label": "Hyperparameter Sweep",
+          "availability": "enabled"
+        },
+        {
+          "id": "parameters",
+          "slot": "configuration.parameter_sweeps",
+          "availability": "ready"
+        },
+        {
+          "id": "study-monitor",
+          "slot": "monitor.tuning",
+          "label": "Tuning study",
+          "availability": "ready"
+        }
+      ],
+      "tuning_features": {
+        "objective_modes": [
+          "metric",
+          "component"
+        ],
+        "pruning": true,
+        "pruning_objectives": true,
+        "pruning_repeated_runs": true
+      }
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "__init__.py",
+      "component.py",
+      "monitor.py",
+      "parallel.py",
+      "policy.py",
+      "pruning.py",
+      "remote.py",
+      "sweeper.py",
+      "utils.py"
+    ],
+    "resources": [],
+    "configs": {
+      "hydra/sweeper/theta_optuna.yaml": "configs/hydra/sweeper/theta_optuna.yaml"
+    }
+  },
+  "config_paths": [
+    "hydra/sweeper/theta_optuna.yaml"
+  ],
+  "exports": {
+    "hydra_sweeper": "sweeper.py:ThetaOptunaSweeper"
+  }
+}

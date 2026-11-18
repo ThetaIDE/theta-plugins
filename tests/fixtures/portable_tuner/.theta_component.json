@@ -1,0 +1,6 @@
+{
+  "id": "fixture-grid", "name": "Independent portable grid tuner", "kind": "tuner",
+  "version": "1.0.0", "storage_version": 3, "api_version": 1,
+  "capabilities": [{"id": "fixture-grid", "kind": "tuner", "entry_point": "component.py:GridTuner"}],
+  "payload": {"implementations": ["component.py"], "resources": [], "configs": {}}
+}
