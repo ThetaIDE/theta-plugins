@@ -28,13 +28,15 @@ class BlendRoutingPlotter(BasePlotter):
         data = np.load(path, allow_pickle=False)
         states = np.asarray(data['states'])
         weights = np.asarray(data['weights'])
-        names = np.asarray(data['module_types']).astype(str)
+        if 'expert_names' not in data.files:
+            raise ValueError(f'{path} predates BlendRL 1.4.1 and has no expert_names; rerun to plot routing samples')
+        names = np.asarray(data['expert_names']).astype(str)
         if states.ndim < 2 or weights.ndim != 2 or len(states) != len(weights) or weights.shape[1] != len(names) or len(states) == 0:
             raise ValueError(f'Invalid routing samples: {path}')
         output.mkdir(parents=True, exist_ok=True)
         fig, ax = plt.subplots(figsize=(8, 5))
         for i, name in enumerate(names):
-            ax.hist(weights[:, i], bins=20, range=(0, 1), alpha=.45, label=f'{name} {i}')
+            ax.hist(weights[:, i], bins=20, range=(0, 1), alpha=.45, label=name)
         ax.set(xlabel='Routing weight', ylabel='Sample count', title='Routing weight distribution')
         ax.legend()
         fig.tight_layout(); fig.savefig(output / 'weights.png', dpi=150); plt.close(fig)
@@ -42,7 +44,7 @@ class BlendRoutingPlotter(BasePlotter):
         if not .5 < threshold <= 1:
             raise ValueError('authority_threshold must be in (0.5, 1]')
         exclusive = [(weights[:, i] >= threshold).mean() for i in range(len(names))]
-        labels = [f'{name} {i}' for i, name in enumerate(names)] + ['Mixed']
+        labels = list(names) + ['Mixed']
         shares = exclusive + [float((weights.max(axis=1) < threshold).mean())]
         fig, ax = plt.subplots(figsize=(8, 2.5))
         left = 0.0
@@ -68,7 +70,7 @@ class BlendRoutingPlotter(BasePlotter):
                 fig, ax = plt.subplots(figsize=(7, 5))
                 points = ax.scatter(projected[:, 0], projected[:, 1], c=weights[:, i], vmin=0, vmax=1, s=12, cmap='viridis')
                 fig.colorbar(points, ax=ax, label='Routing weight')
-                ax.set(xlabel='Principal component 1', ylabel='Principal component 2', title=f'Routing by state: {name} {i}')
+                ax.set(xlabel='Principal component 1', ylabel='Principal component 2', title=f'Routing by state: {name}')
                 fig.tight_layout(); fig.savefig(output / f'state_{i}.png', dpi=150); plt.close(fig)
             if cfg.get('tsne', False) and len(states) >= 4:
                 from sklearn.manifold import TSNE
@@ -77,7 +79,7 @@ class BlendRoutingPlotter(BasePlotter):
                     fig, ax = plt.subplots(figsize=(7, 5))
                     points = ax.scatter(embedding[:, 0], embedding[:, 1], c=weights[:, i], vmin=0, vmax=1, s=12, cmap='viridis')
                     fig.colorbar(points, ax=ax, label='Routing weight')
-                    ax.set(xlabel='t-SNE 1', ylabel='t-SNE 2', title=f'Routing manifold: {name} {i}')
+                    ax.set(xlabel='t-SNE 1', ylabel='t-SNE 2', title=f'Routing manifold: {name}')
                     fig.tight_layout(); fig.savefig(output / f'manifold_{i}.png', dpi=150); plt.close(fig)
         # Optional experiment-supplied cohort labels or reference distance scores.
         for key in ('cohort', 'distance'):
@@ -92,12 +94,12 @@ class BlendRoutingPlotter(BasePlotter):
             if key == 'cohort':
                 labels = np.unique(x)
                 for i, name in enumerate(names):
-                    ax.plot(labels.astype(str), [weights[x == label, i].mean() for label in labels], marker='o', label=f'{name} {i}')
+                    ax.plot(labels.astype(str), [weights[x == label, i].mean() for label in labels], marker='o', label=name)
             else:
                 order = np.argsort(x)
                 bins = [chunk for chunk in np.array_split(order, min(5, len(order))) if len(chunk)]
                 for i, name in enumerate(names):
-                    ax.plot([x[chunk].mean() for chunk in bins], [weights[chunk, i].mean() for chunk in bins], marker='o', label=f'{name} {i}')
+                    ax.plot([x[chunk].mean() for chunk in bins], [weights[chunk, i].mean() for chunk in bins], marker='o', label=name)
             ax.set(xlabel=key.title(), ylabel='Mean routing weight', ylim=(0, 1), title=f'Routing by {key}')
             ax.legend()
             fig.tight_layout(); fig.savefig(output / f'{key}.png', dpi=150); plt.close(fig)

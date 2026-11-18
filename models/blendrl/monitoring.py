@@ -7,7 +7,7 @@ from __future__ import annotations
 import math
 
 import torch
-from .monitor_catalog import expert_names
+from .monitor_catalog import experts
 
 
 def routing_metrics(weights: torch.Tensor, module_types: list[str], *, threshold: float = 0.9,
@@ -30,7 +30,8 @@ def routing_metrics(weights: torch.Tensor, module_types: list[str], *, threshold
                'blend/entropy_normalized': (entropy.mean() / math.log(n)).item() if n > 1 else 0.0,
                'blend/mixed_share': (w.max(-1).values < threshold).float().mean().item()}
     winners = w.argmax(-1)
-    names = expert_names(module_types)
+    listed = experts(module_types)
+    names = [name for name, _, _ in listed]
     for i, name in enumerate(names):
         values = w[:, i]
         prefix = f'blend/{name}'
@@ -38,10 +39,10 @@ def routing_metrics(weights: torch.Tensor, module_types: list[str], *, threshold
                         f'{prefix}/weight_std': values.std(unbiased=False).item(),
                         f'{prefix}/dominant_share': (winners == i).float().mean().item(),
                         f'{prefix}/exclusive_share': (values >= threshold).float().mean().item()})
-    for kind in ('neural', 'logic'):
-        indices = [i for i, t in enumerate(module_types) if t == kind]
-        if indices:
-            metrics[f'blend/{kind}/weight_mean'] = w[:, indices].sum(-1).mean().item()
+    # A lone expert of a type already reports blend/<type>/weight_mean itself.
+    for kind in {kind for _, kind, number in listed if number}:
+        indices = [i for i, (_, other, _) in enumerate(listed) if other == kind]
+        metrics[f'blend/{kind}/weight_mean'] = w[:, indices].sum(-1).mean().item()
     if expert_probs is not None:
         p = expert_probs.detach().float()
         if p.ndim != 3 or p.shape[:2] != w.shape or p.shape[2] == 0 or not torch.isfinite(p).all() or (p < 0).any() or not torch.allclose(p.sum(-1), torch.ones_like(p[..., 0]), atol=1e-4):

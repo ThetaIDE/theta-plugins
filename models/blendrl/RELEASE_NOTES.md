@@ -1,3 +1,10 @@
+# BlendRL 1.4.1
+
+- Routing metrics name experts by type instead of module position: `logic_0`/`neural_1` become `logic`/`neural`, and repeated types are numbered within the type (`logic_1`, `logic_2`). The redundant per-type `weight_mean` is emitted only for repeated types. Metrics recorded by earlier versions keep their old names.
+- Every routing output has a readable label (for example "Logic expert · mean weight") and a description that says what the expert is.
+- The `blendrl/reliance` outputs now have descriptions, including what each intervention does.
+- Routing sample plots label experts with the same names; `model_monitoring_samples.npz` stores `expert_names`; sample files from earlier versions lack it and the plotter rejects them.
+
 # BlendRL 1.4.0
 
 Compatibility is declared as capability `requires` rules (Theta SDK 3.1); earlier IDEs reject the manifest.

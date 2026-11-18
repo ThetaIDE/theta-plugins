@@ -566,11 +566,14 @@ class BlenderActorCritic(nn.Module):
     monitoring_namespace = "blend"
 
     def monitoring_metadata(self):
-        return {"module_types": np.asarray(self.module_types, dtype=str)}
+        from ..monitor_catalog import expert_names
+        return {"module_types": np.asarray(self.module_types, dtype=str),
+                "expert_names": np.asarray(expert_names(self.module_types), dtype=str)}
 
     @torch.no_grad()
     def collect_monitoring(self, obs, *, include_experts=False):
         """Summarize routing on an explicitly provided observation batch."""
+        from ..monitor_catalog import expert_names
         from ..monitoring import routing_metrics
 
         logic_obs = self.build_logic_observation(obs)
@@ -581,8 +584,9 @@ class BlenderActorCritic(nn.Module):
             _, weights = self.actor(obs, logic_obs)
             probs = self.actor._expert_probs
             metrics = routing_metrics(weights, self.module_types, expert_probs=probs)
+            names = expert_names(self.module_types)
             for i, active in self.actor._logic_coverage.items():
-                metrics[f"blend/logic_{i}/coverage"] = active.float().mean().item()
+                metrics[f"blend/{names[i]}/coverage"] = active.float().mean().item()
             if self.blend_function == "gumbel_softmax" and self.actor.actor_mode == "hybrid":
                 gate = routing_metrics(self.actor._soft_gate, self.module_types)
                 metrics.update({key.replace("blend/", "blend/soft_gate/", 1): value
