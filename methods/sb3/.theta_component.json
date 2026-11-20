@@ -2,7 +2,7 @@
   "id": "sb3-suite",
   "name": "Stable-Baselines3 Suite",
   "kind": "method",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Standard reinforcement learning algorithms (PPO, DQN, A2C, SAC) powered by Stable-Baselines3.",
   "author": "DLR-RM & SB3 Contributors",
   "tags": [
@@ -192,6 +192,11 @@
           "config": "dataset_path",
           "present": false
         }
+      ],
+      "preflight": "execution_hooks.py:ppo_preflight",
+      "tuning_profile_hook": "execution_hooks.py:ppo_tuning_profile",
+      "provides": [
+        "dynamic_configuration.v1"
       ]
     },
     {
@@ -253,7 +258,8 @@
       "monitor_catalog.py",
       "sb3_monitoring.py",
       "sb3_runner.py",
-      "theta_sb3_policy.py"
+      "theta_sb3_policy.py",
+      "ppo_dynamic.py"
     ],
     "resources": [
       "requirements.txt"
@@ -444,6 +450,10 @@
             "enum": [
               "sb3"
             ]
+          },
+          "ent_coef": {
+            "type": "number",
+            "minimum": 0
           }
         }
       },
@@ -506,5 +516,8 @@
         }
       }
     }
+  },
+  "compatibility": {
+    "sdk": ">=3.5,<4"
   }
 }

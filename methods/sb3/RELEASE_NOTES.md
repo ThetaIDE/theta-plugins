@@ -1,3 +1,10 @@
+# 2.3.0
+
+PPO advertises rollout-aligned transition budgets to compatible tuners. Native
+PPO supports scheduled learning-rate and entropy updates, plus peer transfer of
+policy and optimizer state at rollout boundaries. The recipient uses its own
+seed stream and resets the environment. Requires Theta SDK 3.5.
+
 # 2.2.0
 
 PPO serves three opt-in model protocols, which a model lists in `sb3_protocols`:

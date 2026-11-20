@@ -1,0 +1,74 @@
+{
+  "id": "dehb",
+  "name": "DEHB",
+  "kind": "tuner",
+  "version": "0.1.0",
+  "description": "Local differential evolution Hyperband for Theta transition-budget runners.",
+  "storage_version": 3,
+  "api_version": 1,
+  "dependencies": {
+    "pip": [
+      "dehb>=0.1.2,<0.2",
+      "ConfigSpace>=1,<2",
+      "pyarrow>=16.1,<24",
+      "numpy>=1.24,<2"
+    ],
+    "components": []
+  },
+  "capabilities": [
+    {
+      "id": "dehb",
+      "kind": "tuner",
+      "entry_point": "component.py:Tuner",
+      "contribution_api": 1,
+      "contributions": [
+        {
+          "id": "configure",
+          "slot": "configuration.tuning",
+          "availability": "enabled",
+          "label": "Hyperparameter Sweep"
+        },
+        {
+          "id": "parameters",
+          "slot": "configuration.parameter_sweeps",
+          "availability": "ready",
+          "label": "Parameter search space"
+        },
+        {
+          "id": "study",
+          "slot": "monitor.tuning",
+          "availability": "ready",
+          "label": "Tuning study"
+        }
+      ],
+      "tuning_features": {
+        "objective_modes": [
+          "metric"
+        ],
+        "pruning": false
+      },
+      "readiness": {
+        "distributions": [
+          "dehb",
+          "ConfigSpace",
+          "pyarrow"
+        ]
+      }
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "component.py"
+    ],
+    "configs": {
+      "hydra/sweeper/dehb.yaml": "configs/hydra/sweeper/dehb.yaml"
+    },
+    "resources": []
+  },
+  "exports": {
+    "hydra_sweeper": "component.py:Sweeper"
+  },
+  "compatibility": {
+    "sdk": ">=3.5,<4"
+  }
+}

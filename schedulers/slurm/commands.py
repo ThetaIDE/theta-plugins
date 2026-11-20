@@ -1,6 +1,8 @@
 """Slurm project setup and login handoff commands. Network execution is explicit."""
 from pathlib import Path
 import os, shlex, subprocess, sys
+
+INTERACTIVE_BUNDLE_ENV = "THETA_SLURM_INTERACTIVE_BUNDLE"
 from src.app.api.sites import BUNDLE_REQUIREMENTS, rsync_shell, safe_path, ssh_arguments
 from src.app.api.workspace import WorkspacePaths
 
@@ -13,13 +15,62 @@ def submission_command(config, experiment, site):
     return shlex.join([str(python), 'run_pipeline.py', experiment])
 
 
+def _command_vector(settings, key, *, optional=False):
+    value = settings.get(key)
+    if optional and value is None:
+        return []
+    if not isinstance(value, list) or not value or any(not isinstance(item, str) or not item for item in value):
+        raise ValueError(f'interactive_allocation.{key} must be a nonempty list of command arguments')
+    return [os.path.expanduser(value[0]), *value[1:]]
+
+
+def _interactive_arguments(config, experiment, site, resources, extra_flags, digest):
+    """Return a shell-quoted argument string for a local Slurm allocation helper."""
+    options = {'nodes': 'nodes', 'ntasks': 'ntasks', 'cores': 'cpus-per-task',
+               'memory': 'mem', 'time': 'time', 'partition': 'partition',
+               'account': 'account', 'qos': 'qos', 'gres': 'gres'}
+    args = [f'--{flag}={resources[key]}' for key, flag in options.items() if resources.get(key)]
+    root = config['remote_root']
+    args += [f'--chdir={root}', *extra_flags]
+    args += ['srun', '--nodes=1', '--ntasks=1', f'--cpus-per-task={resources["cores"]}', f'--chdir={root}',
+             'env', f'{INTERACTIVE_BUNDLE_ENV}={digest}']
+    return shlex.join(args) + ' ' + submission_command(config, experiment, site)
+
+
+def _launch_interactive(root, site, experiment, config, settings, push):
+    from src.app.api.config import compose_experiment
+    from .execution import validate_allocation
+
+    if not isinstance(settings, dict):
+        raise ValueError('interactive_allocation must be a mapping')
+    launcher = _command_vector(settings, 'command')
+    prepare = _command_vector(settings, 'prepare', optional=True)
+    paths = WorkspacePaths(root)
+    cfg = compose_experiment(experiment, workspace=paths).cfg
+    resources = validate_allocation(cfg, paths=paths)
+    if not cfg.site.get('execution'):
+        raise ValueError('Interactive allocation requires a scratch execution policy')
+    if prepare:
+        subprocess.run(prepare, cwd=root, check=True)
+    uploaded = push(root, site, experiment, live_output=True)
+    arguments = _interactive_arguments(config, experiment, site, resources,
+                                        cfg.site.get('extra_sbatch_flags') or (), uploaded['bundle_sha256'])
+    print('Project upload complete. Requesting an interactive allocation and starting the compute step:', flush=True)
+    print(arguments, flush=True)
+    os.execvp(launcher[0], [*launcher, arguments])
+    return 0
+
+
 def launch_in_terminal(root, site, experiment):
     """Called inside the local terminal PTY. Upload, then replace this process with SSH."""
     import os
-    from src.app.api.sites import connection, push
+    from src.app.api.sites import connection, load_site, push
     root = Path(root).resolve()
     config = connection(root, site)
     print(f'Theta: preparing {experiment} for {site}', flush=True)
+    interactive = load_site(root, site).get('interactive_allocation')
+    if interactive is not None:
+        return _launch_interactive(root, site, experiment, config, interactive, push)
     push(root, site, experiment, live_output=True)
     print('\nProject upload complete. Opening the cluster SSH terminal.', flush=True)
     print('Once connected, paste the copied command and press Enter to validate and submit.', flush=True)
@@ -93,5 +144,3 @@ def verify_environment(bundle):
                              f'python -m pip install -r {BUNDLE_REQUIREMENTS}') from exc
         if requirement.specifier and installed not in requirement.specifier:
             raise ValueError(f'Dependency {value} conflicts with installed {installed}')
-
-

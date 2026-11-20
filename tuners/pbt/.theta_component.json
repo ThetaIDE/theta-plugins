@@ -1,0 +1,62 @@
+{
+  "id": "pbt",
+  "name": "Population-Based Training",
+  "kind": "tuner",
+  "version": "0.1.0",
+  "description": "Local synchronous population-based training for compatible Theta runners.",
+  "storage_version": 3,
+  "api_version": 1,
+  "dependencies": {
+    "pip": [],
+    "components": []
+  },
+  "capabilities": [
+    {
+      "id": "pbt",
+      "kind": "tuner",
+      "entry_point": "component.py:Tuner",
+      "contribution_api": 1,
+      "contributions": [
+        {
+          "id": "configure",
+          "slot": "configuration.tuning",
+          "availability": "enabled",
+          "label": "Hyperparameter Sweep"
+        },
+        {
+          "id": "parameters",
+          "slot": "configuration.parameter_sweeps",
+          "availability": "ready",
+          "label": "Parameter search space"
+        },
+        {
+          "id": "study",
+          "slot": "monitor.tuning",
+          "availability": "ready",
+          "label": "Tuning study"
+        }
+      ],
+      "tuning_features": {
+        "objective_modes": [
+          "metric"
+        ],
+        "pruning": false
+      }
+    }
+  ],
+  "payload": {
+    "implementations": [
+      "component.py"
+    ],
+    "configs": {
+      "hydra/sweeper/pbt.yaml": "configs/hydra/sweeper/pbt.yaml"
+    },
+    "resources": []
+  },
+  "exports": {
+    "hydra_sweeper": "component.py:Sweeper"
+  },
+  "compatibility": {
+    "sdk": ">=3.5,<4"
+  }
+}

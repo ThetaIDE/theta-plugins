@@ -1,3 +1,11 @@
+# 1.3.1
+
+Resuming a study no longer replays its first suggestions. A seeded sampler is rebuilt
+on resume and restarted its random stream, so trials after a resume repeated the
+study's first parameter sets; the sampler's seed is now offset by the trials already
+in the study. QMC sampling, which continues its sequence from the stored trial
+count, is unchanged.
+
 # 1.3.0
 
 Pruning works with objective components and repeated training runs. Such a trial

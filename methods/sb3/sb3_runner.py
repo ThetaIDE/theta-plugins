@@ -170,6 +170,7 @@ def execute(cfg: DictConfig, context):
     from src.app.api.execution import RunResult
     if cfg.get("resume") or cfg.get("recover") or context.checkpoint:
         raise ValueError("sb3-suite supports inference reload of native .zip checkpoints; exact training resume is unsupported")
+    context.report_progress("transitions", 0)
     context.check_cancelled()
     if os.environ.get('THETA_MANAGED_THREADS'):
         import torch
@@ -253,6 +254,8 @@ def execute(cfg: DictConfig, context):
         )
     ckpt_dir = context.artifacts
     ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+    final_evaluation = cfg.get("theta_final_evaluation", False)
 
     # Custom SB3 Callback to bridge telemetry into the Theta-IDE telemetry run
     class ThetaMetricsCallback(BaseCallback):
@@ -385,7 +388,7 @@ def execute(cfg: DictConfig, context):
                 monitor.report(value, self.eval_index)
             if reward > self.best_eval_reward:
                 # Publish a best checkpoint only after successful completion.
-                self.model.save(str(ckpt_dir / ".best_evaluation.zip"))
+                self.model.save(str(ckpt_dir / ".best_evaluation.zip"), exclude=["train"])
                 self.best_eval_reward = reward
             self.eval_index += 1
             self.last_eval = step
@@ -397,11 +400,12 @@ def execute(cfg: DictConfig, context):
 
         def _on_training_start(self) -> None:
             self.model.logger.output_formats.append(SB3TelemetryWriter(self.run, self))
-            if self._evaluation_enabled():
+            if not final_evaluation and self._evaluation_enabled():
                 self._evaluate()
             self.run.set_stage("training", "Training started")
 
         def _on_step(self) -> bool:
+            context.report_progress("transitions", self.num_timesteps - dynamic.start if dynamic else self.num_timesteps)
             context.check_cancelled()
             self.episodes.record(self.locals.get("infos", []), self.num_timesteps)
             interval = int(model_cfg.get("monitoring_interval", 256) or 0)
@@ -411,7 +415,7 @@ def execute(cfg: DictConfig, context):
             freq = cfg.get("eval_freq_steps") or cfg.get("eval_freq") or max(1, total_timesteps // 4)
             # At the final rollout, SB3 has not applied its last PPO update yet.
             # Defer this evaluation to training_end so scores match saved weights.
-            if (self.num_timesteps < self.model._total_timesteps
+            if (not final_evaluation and self.num_timesteps < self.model._total_timesteps
                     and (monitor is not None or self._evaluation_enabled())
                     and self.num_timesteps - max(0, self.last_eval) >= int(freq)):
                 self._evaluate()
@@ -422,7 +426,7 @@ def execute(cfg: DictConfig, context):
                 # SB3's regular dump precedes train(); flush the last update's
                 # diagnostics before reporting the final evaluation.
                 self.model.logger.dump(step=self.num_timesteps)
-                if (monitor is not None or self._evaluation_enabled()) and self.last_eval != self.num_timesteps:
+                if (final_evaluation or dynamic or monitor is not None or self._evaluation_enabled()) and self.last_eval != self.num_timesteps:
                     self._evaluate()
                 self._save_model_samples()
             finally:
@@ -509,6 +513,10 @@ def execute(cfg: DictConfig, context):
         logger.finish(status="failed")
         env.close()
         raise
+    dynamic = None
+    if cfg.get("theta_dynamic") is not None:
+        from .ppo_dynamic import Session
+        dynamic = Session(model, cfg, ckpt_dir, context.seed, context)
     active_model = getattr(model.policy, "theta_model_module", None)
     if active_model is None and hasattr(model.policy, "q_net"):
         active_model = getattr(model.policy.q_net, "theta_model_module", None)
@@ -533,12 +541,36 @@ def execute(cfg: DictConfig, context):
     start_time = time.time()
     status = "failed"
     objective = None
+    training_state = None
     logger.set_stage("starting", "Preparing diagnostics")
     try:
         from src.app.api.monitoring import MonitorManager
         from .sb3_monitoring import monitored_learn
         monitor_manager = MonitorManager(cfg, logger, active_model, algo_name, make_environment)
-        monitored_learn(model, monitor_manager, total_timesteps=total_timesteps, callback=cb)
+        if dynamic is None:
+            monitored_learn(model, monitor_manager, total_timesteps=total_timesteps, callback=cb)
+        else:
+            train = model.train
+
+            def train_at_boundary():
+                train()
+                rates = [group["lr"] for group in model.policy.optimizer.param_groups]
+                effective = dynamic.parameters()
+                if any(rate != effective["agent.learning_rate"] for rate in rates):
+                    raise RuntimeError("PPO optimizer used a different learning rate")
+                dynamic.effective_updates.append({"step": model.num_timesteps, "parameters": effective})
+                metrics = dict(model.logger.name_to_value)
+                dynamic.boundary(metrics)
+
+            dynamic.boundary()
+            model.train = train_at_boundary
+            try:
+                monitored_learn(model, monitor_manager, total_timesteps=total_timesteps,
+                                callback=cb, reset_num_timesteps=not dynamic.start)
+            finally:
+                del model.train
+            training_state = dynamic.checkpoint()
+            logger.artifact(training_state, kind="checkpoint")
         if is_sweep:
             from src.app.api.tuning import objective_metric, objective_value
 
@@ -586,8 +618,13 @@ def execute(cfg: DictConfig, context):
     print(f"\n[SB3 Engine Complete] Total time: {end_time - start_time:.2f}s")
     print(f"Checkpoints saved to: {ckpt_dir}")
     print(f"Telemetry logged to: {logger.version_dir}")
+    artifacts = [{"path": str(ckpt_dir / name), "kind": "checkpoint", "format": "sb3.zip",
+                  "role": "final" if name == "latest_model.zip" else "best"} for name in checkpoint_names]
+    if training_state is not None:
+        artifacts.append({"path": str(training_state), "kind": "checkpoint",
+                          "format": "theta.sb3-ppo-training/v1", "role": "training_state"})
     return RunResult(status=status, objective=objective,
                      metrics={"eval/reward": cb.last_eval_reward} if cb.last_eval_reward is not None else {},
                      metric_definitions={"eval/reward": {"direction": "maximize", "meaning": "Mean greedy episodic return"}},
-                     artifacts=[{"path": str(ckpt_dir / name), "kind": "checkpoint", "format": "sb3.zip"} for name in checkpoint_names],
-                     progress={"unit": "transitions", "completed": cb.num_timesteps})
+                     artifacts=artifacts,
+                     progress=context.metadata.get("progress", {"unit": "transitions", "completed": 0}))

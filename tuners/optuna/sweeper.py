@@ -77,6 +77,13 @@ def _export_summary(config, study):
         logger.exception("Could not write tuning summary for study %s", study.study_name)
 
 
+def _resumed_sampler(config, existing):
+    from hydra.utils import instantiate
+    sampler = OmegaConf.select(config, "hydra.sweeper.sampler")
+    seed = sampler.get("seed")
+    return instantiate(sampler, seed=None if seed is None else (int(seed) + existing) % 2**32)
+
+
 class ThetaOptunaSweeper(Sweeper):
     def __init__(self, sampler, direction, storage, study_name, n_trials, n_jobs, search_space,
                  pruner, pruner_startup_trials, pruner_warmup_steps, timeout_seconds, max_failed_trials):
@@ -144,6 +151,11 @@ class ThetaOptunaSweeper(Sweeper):
             study = optuna.create_study(study_name=impl.study_name, storage=storage,
                                         sampler=impl.sampler, pruner=self.pruner,
                                         direction=direction, load_if_exists=True)
+        if study.trials and not isinstance(impl.sampler, optuna.samplers.QMCSampler):
+            # A seeded sampler rebuilt on resume restarts its random stream and
+            # replays the study's first suggestions; offset it by the trials so far.
+            # QMC already continues its sequence from the stored trial count.
+            study.sampler = impl.sampler = _resumed_sampler(impl.config, len(study.trials))
         tuning = impl.config.get("tuning")
         from src.app.api.tuning import objective_metric
         metric = objective_metric(impl.config, "") or None

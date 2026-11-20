@@ -94,6 +94,29 @@ def test_hydra_sweeps_pass_optuna_trial_numbers_after_resuming(tmp_path, monkeyp
 
 
 
+def test_resuming_a_seeded_study_does_not_replay_its_first_suggestions(tmp_path):
+    from package_fixtures import sweep_workspace
+    paths, search = sweep_workspace(tmp_path / "workspace")
+    script = tmp_path / "objective.py"
+    script.write_text(
+        "import hydra\n"
+        f"@hydra.main(version_base=None, config_path={str(paths.config)!r}, config_name='config')\n"
+        "def main(cfg): return float(cfg.x)\n"
+        "if __name__ == '__main__': main()\n", encoding="utf-8")
+    storage = f"sqlite:///{tmp_path / 'seeded.db'}"
+    env = {**os.environ, "THETA_WORKSPACE": str(paths.root), "PYTHONPATH": os.pathsep.join([str(IDE), os.environ.get("PYTHONPATH", "")])}
+    command = [sys.executable, str(script), "--multirun", search, *sweeper_args(storage, "seeded", 2),
+               "++hydra.sweeper.sampler.seed=7", "++hydra.sweeper.sampler.n_startup_trials=10",
+               f"hydra.sweep.dir={tmp_path / 'hydra'}", "+x=interval(0.0,1.0)"]
+    for _ in range(2):
+        result = subprocess.run(command, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=60)
+        assert result.returncode == 0, result.stdout + result.stderr
+    values = [trial.params["x"] for trial in optuna.load_study(study_name="seeded", storage=storage).trials]
+    assert len(values) == 4
+    assert values[2:] != values[:2]
+
+
+
 def test_hydra_sweep_marks_invalid_objective_as_failed(tmp_path):
     from package_fixtures import sweep_workspace
     project = IDE

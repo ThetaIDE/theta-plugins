@@ -1,0 +1,26 @@
+# @package _global_
+defaults:
+  - override /env: gym_classic_control/pendulum
+paradigm: online_rl
+no_plot: true
+eval_episodes: 5
+trainer:
+  accelerator: cpu
+total_timesteps: 8192
+theta_dynamic:
+  api_version: 1
+  schedule:
+    - step: 4096
+      parameters:
+        agent.learning_rate: 0.001
+        agent.ent_coef: 0.01
+methods:
+  ppo:
+    model:
+      name: basics/dnn
+      sb3_native_policy: true
+    agent:
+      name: sb3/ppo
+      n_steps: 256
+      batch_size: 64
+      n_epochs: 5

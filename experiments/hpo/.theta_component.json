@@ -1,0 +1,35 @@
+{
+  "id": "hpo",
+  "name": "HPO Pendulum examples",
+  "description": "DEHB fixed search, PPO schedule replay, and population-based training on Pendulum-v1.",
+  "kind": "experiment",
+  "version": "0.1.0",
+  "storage_version": 3,
+  "api_version": 1,
+  "compatibility": {
+    "sdk": ">=3.5,<4"
+  },
+  "dependencies": {
+    "components": [
+      {
+        "id": "sb3-suite",
+        "version": ">=2.3,<3"
+      },
+      "dehb",
+      "pbt",
+      "gym_classic_control",
+      "dnn"
+    ],
+    "pip": []
+  },
+  "capabilities": [],
+  "payload": {
+    "implementations": [],
+    "resources": [],
+    "configs": {
+      "experiment/HPO/dehb_pendulum.yaml": "configs/experiment/HPO/dehb_pendulum.yaml",
+      "experiment/HPO/pbt_pendulum.yaml": "configs/experiment/HPO/pbt_pendulum.yaml",
+      "experiment/HPO/ppo_replay_pendulum.yaml": "configs/experiment/HPO/ppo_replay_pendulum.yaml"
+    }
+  }
+}

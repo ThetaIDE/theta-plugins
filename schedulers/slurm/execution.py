@@ -85,18 +85,38 @@ def validate_allocation(cfg, *, paths=None):
 
 
 def submit(root, experiment, overrides, cfg):
+    from .commands import INTERACTIVE_BUNDLE_ENV
+
+    interactive = (cfg.get('site') or {}).get('interactive_allocation')
+    allocation = None
+    if interactive is not None:
+        job_id = os.environ.get('SLURM_JOB_ID', '')
+        step_id = os.environ.get('SLURM_STEP_ID', '')
+        bundle_id = os.environ.get(INTERACTIVE_BUNDLE_ENV, '')
+        if not (job_id.isdigit() and step_id.isdigit() and re.fullmatch(r'[a-f0-9]{64}', bundle_id)):
+            raise ValueError('Start this site with site launch to run in its interactive Slurm compute step')
+        allocation = job_id, bundle_id
     # The same lock protects source references, continuation ownership, and GC.
     with transfer_lock(root):
-        return _submit(root, experiment, overrides, cfg)
+        record = _submit(root, experiment, overrides, cfg, allocation=allocation)
+    if allocation:
+        script = host.receipt_path(root, record['execution_id']).with_name('job.sbatch')
+        result = subprocess.run(['/bin/bash', str(script)], cwd=root)
+        if result.returncode:
+            raise SystemExit(result.returncode if result.returncode > 0 else 128 - result.returncode)
+        record = read_json(script.with_name('submission.json'))
+    return record
 
 
-def _submit(root, experiment, overrides, cfg):
-    """Called on the cluster. A lost sbatch response is recorded as unknown, never retried."""
+def _submit(root, experiment, overrides, cfg, *, allocation=None):
+    """Prepare one execution inside an existing allocation or submit it to Slurm."""
     from omegaconf import OmegaConf
     from .headers import generate_sbatch_header
     root = Path(root).resolve()
     from src.app.api.sites import resolve_policy as resolve
     policy = resolve(cfg, root)
+    if allocation and not policy:
+        raise ValueError('Interactive allocation requires a scratch execution policy')
     from src.app.api.workspace import WorkspacePaths
     paths = WorkspacePaths(root)
     resources = validate_allocation(cfg, paths=paths)
@@ -117,6 +137,8 @@ def _submit(root, experiment, overrides, cfg):
         snapshot = directory / 'workspace'
         if policy:
             source = host.current_bundle(root)
+            if allocation and source.get('bundle_sha256') != allocation[1]:
+                raise ValueError('The uploaded bundle changed while waiting for the allocation. Launch again to upload it.')
             pushed = (source.get('experiment') or {}).get('selector')
             if pushed != experiment:
                 raise ValueError(f'The pushed bundle is for {pushed or "no experiment"}; push {experiment} to this site first')
@@ -181,6 +203,8 @@ def _submit(root, experiment, overrides, cfg):
         script = header + '\nset -eo pipefail\n'
         script += 'cd ' + shlex.quote(str(root)) + '\n'
         script += 'unset THETA_RESOURCE_POOL THETA_RESOURCE_QUEUE_PARENT THETAIDE_SETTINGS_FILE\n'
+        # The allocation loads its own pinned inputs from the extracted bundle.
+        script += 'unset THETA_CONFIG_SNAPSHOT THETA_INPUTS_SNAPSHOT THETA_PIPELINE_PID\n'
         script += 'export THETA_WORKSPACE=' + shlex.quote(str(snapshot)) + '\n'
         script += 'export THETA_DATA_DIR=' + shlex.quote(str(snapshot / '.thetaide')) + '\n'
         bootstrap_root = root if policy else snapshot
@@ -200,6 +224,12 @@ def _submit(root, experiment, overrides, cfg):
         # Slurm signals the batch PID; the supervisor must own that PID to finalize.
         script += 'exec ' + shlex.join(host.site_cli_command(python, '_run', '--root', str(root), execution_id)) + '\n'
         (directory / 'job.sbatch').write_text(script)
+        if allocation:
+            record.update(state='pending', job_id=allocation[0])
+            write_json(path, record)
+            print(json.dumps({'execution_id': execution_id, 'state': record['state'],
+                              'job_id': record['job_id'], 'receipt': str(path)}, indent=2), flush=True)
+            return record
         record['state'] = 'submitting'
         write_json(path, record)
         try:

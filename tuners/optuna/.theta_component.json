@@ -2,7 +2,7 @@
   "id": "optuna",
   "name": "Optuna tuner",
   "kind": "tuner",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Hyperparameter sweeps with Optuna: metric or objective-component studies, pruning, parallel and remote trials, and a study monitor.",
   "author": {
     "name": "Theta-IDE Team"
